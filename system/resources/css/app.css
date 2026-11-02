@@ -1,0 +1,125 @@
+@import 'tailwindcss';
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap');
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+
+@theme {
+    --font-sans: 'Nunito', ui-sans-serif, system-ui, sans-serif;
+
+    /* Design system from sites design */
+    --color-primary: #FE9F43;
+    --color-primary-hover: #FD8510;
+    --color-primary-soft: #FFEDDC;
+    --color-secondary: #092C4C;
+    --color-ink: #092C4C;
+    --color-heading: #212B36;
+    --color-muted: #646B72;
+    --color-cream: #F7F7F7;
+    --color-herb: #FE9F43;
+    --color-lime: #FFEDDC;
+    --color-coral: #FF0000;
+    --color-success: #3EB780;
+    --color-info: #155EEF;
+    --color-warning: #FFCA18;
+    --color-border: #E6EAED;
+    --color-light: #F9FAFB;
+}
+
+@layer base {
+    * { box-sizing: border-box; }
+    html { background: #F7F7F7; }
+    body {
+        min-width: 320px;
+        min-height: 100vh;
+        color: #646B72;
+        background: #F7F7F7;
+        font-family: 'Nunito', ui-sans-serif, system-ui, sans-serif;
+        font-size: 14px;
+        line-height: 1.5;
+    }
+    h1, h2, h3, h4, h5, h6 { color: #212B36; font-weight: 700; }
+    button, input, select, textarea { font: inherit; }
+    button { cursor: pointer; }
+    ::selection { background: #FE9F43; color: #fff; }
+    a { color: #FE9F43; }
+}
+
+@layer components {
+    .field {
+        @apply w-full rounded-[5px] border border-border bg-white px-3.5 py-2.5 text-sm text-heading outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20;
+    }
+
+    .btn-primary {
+        @apply inline-flex items-center justify-center gap-2 rounded-[5px] bg-primary px-4 py-2.5 text-sm font-bold text-white transition hover:bg-primary-hover disabled:opacity-50;
+    }
+
+    .btn-secondary {
+        @apply inline-flex items-center justify-center gap-2 rounded-[5px] border border-border bg-white px-4 py-2.5 text-sm font-bold text-heading transition hover:bg-light disabled:opacity-50;
+    }
+
+    .btn-dark {
+        @apply inline-flex items-center justify-center gap-2 rounded-[5px] bg-secondary px-4 py-2.5 text-sm font-bold text-white transition hover:bg-heading disabled:opacity-50;
+    }
+
+    .card-panel {
+        @apply rounded-lg border border-border bg-white;
+        box-shadow: 0 4px 60px 0 rgba(231, 231, 231, 0.47);
+    }
+
+    .page-title {
+        @apply text-xl font-bold tracking-tight text-heading lg:text-[22px];
+    }
+}
+
+@layer utilities {
+    .scrollbar-none { scrollbar-width: none; }
+    .scrollbar-none::-webkit-scrollbar { display: none; }
+    .soft-shadow { box-shadow: 0 4px 60px 0 rgba(231, 231, 231, 0.47); }
+    .pos-shell {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        height: 100dvh;
+        overflow: hidden;
+        background: #F7F7F7;
+    }
+    .pos-body {
+        display: grid;
+        grid-template-columns: 168px minmax(0, 1fr) minmax(320px, 36%);
+        gap: 0.65rem;
+        min-height: 0;
+        padding: 0.65rem;
+    }
+    .pos-panel {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
+        border-radius: 8px;
+        background: #fff;
+        border: 1px solid #E6EAED;
+    }
+    .pos-scroll { overflow: auto; min-height: 0; scrollbar-width: thin; }
+}
+
+@media (max-width: 1280px) {
+    .pos-body { grid-template-columns: 148px minmax(0, 1fr) minmax(300px, 38%); }
+}
+
+@media (max-width: 1024px) {
+    .pos-body {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(0, 1fr) minmax(280px, 42%);
+    }
+    .pos-cats-collapse { display: none; }
+    .pos-cats-collapse.is-open {
+        display: flex;
+        position: absolute;
+        z-index: 40;
+        top: 3.5rem;
+        left: 0.65rem;
+        bottom: 0.65rem;
+        width: min(240px, 80vw);
+        box-shadow: 0 4px 60px rgba(231, 231, 231, 0.47);
+    }
+}

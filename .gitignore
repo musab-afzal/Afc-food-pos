@@ -1,0 +1,47 @@
+# Environment / secrets
+.env
+.env.*
+!.env.example
+system/.env
+system/.env.*
+!system/.env.example
+
+# Dependencies
+node_modules/
+system/node_modules/
+system/vendor/
+
+# Laravel runtime
+system/storage/logs/*
+!system/storage/logs/.gitignore
+system/storage/framework/cache/data/*
+!system/storage/framework/cache/data/.gitignore
+system/storage/framework/sessions/*
+!system/storage/framework/sessions/.gitignore
+system/storage/framework/views/*
+!system/storage/framework/views/.gitignore
+system/bootstrap/cache/*.php
+!system/bootstrap/cache/.gitignore
+system/database/*.sqlite
+system/database/*.sqlite-journal
+
+# Local tooling / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.cursor/
+.codex/
+.phpunit.cache/
+.phpunit.result.cache
+_ide_helper.php
+Homestead.json
+Homestead.yaml
+auth.json
+
+# Design reference scrape (not app runtime)
+sites design/
+
+# Vite hot file
+system/public/hot
+**/hot
