@@ -127,7 +127,21 @@ export function PosProvider({ children }) {
     }), [state.cart, state.discountTotal, state.couponDiscount, state.loyaltyPoints, state.catalog, state.orderType]);
     totalsRef.current = totals;
 
+    const catalogAddons = useMemo(() => {
+        if (Array.isArray(state.catalog?.addons) && state.catalog.addons.length) {
+            return state.catalog.addons.filter((addon) => addon.is_active !== false);
+        }
+        const unique = new globalThis.Map();
+        (state.catalog?.dishes || []).forEach((dish) => {
+            (dish.addons || []).forEach((addon) => {
+                if (!unique.has(addon.id)) unique.set(addon.id, addon);
+            });
+        });
+        return [...unique.values()];
+    }, [state.catalog]);
+
     const filteredDishes = useMemo(() => {
+        if (state.categoryId === 'addons' || state.categoryId === 'deals') return [];
         const q = state.query.trim().toLowerCase();
         return (state.catalog?.dishes || []).filter((dish) => {
             if (state.categoryId !== 'all' && dish.category_id !== state.categoryId) return false;
@@ -142,13 +156,25 @@ export function PosProvider({ children }) {
         return (state.catalog?.deals || []).filter((deal) => !q || `${deal.name} ${deal.description || ''}`.toLowerCase().includes(q));
     }, [state.catalog, state.categoryId, state.query]);
 
+    const filteredAddons = useMemo(() => {
+        if (state.categoryId !== 'addons' && state.categoryId !== 'all') return [];
+        // On "All Items" keep the grid focused on dishes/deals; add-ons live in their own category.
+        if (state.categoryId === 'all') return [];
+        const q = state.query.trim().toLowerCase();
+        return catalogAddons.filter((addon) => !q || String(addon.name || '').toLowerCase().includes(q));
+    }, [catalogAddons, state.categoryId, state.query]);
+
     const categoryCounts = useMemo(() => {
-        const counts = { all: (state.catalog?.dishes || []).length, deals: (state.catalog?.deals || []).length };
+        const counts = {
+            all: (state.catalog?.dishes || []).length,
+            deals: (state.catalog?.deals || []).length,
+            addons: catalogAddons.length,
+        };
         (state.catalog?.dishes || []).forEach((dish) => {
             counts[dish.category_id] = (counts[dish.category_id] || 0) + 1;
         });
         return counts;
-    }, [state.catalog]);
+    }, [state.catalog, catalogAddons]);
 
     const loadCatalog = useCallback(async () => {
         patch({ loading: true, loadError: '' });
@@ -342,8 +368,6 @@ export function PosProvider({ children }) {
         if (!cart.length) { notify('Add a dish to the cart first.', 'info'); return false; }
         const last = cart[cart.length - 1];
         if (last.isDeal) { notify('Add-ons cannot be added to a deal.', 'error'); return false; }
-        const allowed = (last.dish?.addons || []).some((candidate) => Number(candidate.id) === Number(addon.id));
-        if (!allowed) { notify(`${addon.name} is not available for ${last.dish.name}.`, 'error'); return false; }
         if (last.addons.some((existing) => Number(existing.id) === Number(addon.id))) {
             notify(`${addon.name} is already on ${last.dish.name}.`, 'info');
             return false;
@@ -699,7 +723,7 @@ export function PosProvider({ children }) {
     }, [patch, notify]);
 
     const value = {
-        state, patch, totals, filteredDishes, filteredDeals, categoryCounts, user, can, logout, searchRef,
+        state, patch, totals, filteredDishes, filteredDeals, filteredAddons, catalogAddons, categoryCounts, user, can, logout, searchRef,
         loadCatalog, loadHolds, notify, chooseDish, chooseDeal, handleBarcodeEnter, saveCustomized, addVariantLines,
         changeQuantity, removeItem, addAddonToLastItem, editItem, applyCoupon, holdOrder, resumeHold, deleteHold,
         openPayment, completeSale, loadRecent, createCustomer, clearCart, printReceipt: printPosReceipt,

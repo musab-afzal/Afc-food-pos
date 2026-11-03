@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePosSaleRequest;
 use App\Http\Resources\PosCatalogResource;
+use App\Models\Addon;
 use App\Models\Category;
 use App\Models\Charge;
 use App\Models\Dish;
@@ -30,6 +31,10 @@ class PosController extends Controller
             'categories' => Category::query()->where('is_active', true)->orderBy('sort_order')->get(['id', 'name', 'slug']),
             'dishes' => PosCatalogResource::collection($dishes),
             'deals' => $deals->sellable()->map(fn ($deal) => $deals->toCatalog($deal))->values(),
+            'addons' => Addon::query()
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name', 'price', 'cost', 'is_active']),
             'payment_methods' => PaymentMethod::query()->where('is_active', true)->orderBy('sort_order')->get(),
             'tables' => RestaurantTable::query()
                 ->where('is_active', true)

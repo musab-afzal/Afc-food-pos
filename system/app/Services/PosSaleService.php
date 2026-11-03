@@ -90,10 +90,12 @@ class PosSaleService
                     throw ValidationException::withMessages(["items.$index.dish_variant_id" => ['The selected variant does not belong to this dish.']]);
                 }
 
-                $addonIds = collect($requestedItem['addon_ids'] ?? []);
-                $addons = $dish->addons->whereIn('id', $addonIds);
-                if ($addons->count() !== $addonIds->unique()->count()) {
-                    throw ValidationException::withMessages(["items.$index.addon_ids" => ['An add-on is not available for this dish.']]);
+                $addonIds = collect($requestedItem['addon_ids'] ?? [])->filter()->unique()->values();
+                $addons = $addonIds->isEmpty()
+                    ? collect()
+                    : Addon::query()->where('is_active', true)->whereIn('id', $addonIds)->get();
+                if ($addons->count() !== $addonIds->count()) {
+                    throw ValidationException::withMessages(["items.$index.addon_ids" => ['One or more add-ons are unavailable.']]);
                 }
 
                 $quantity = (int) $requestedItem['quantity'];

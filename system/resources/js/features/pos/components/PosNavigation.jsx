@@ -1,12 +1,13 @@
-﻿import { ArrowLeft, BadgePercent, ChefHat, ClipboardList, LayoutGrid, Utensils } from 'lucide-react';
+﻿import { ArrowLeft, BadgePercent, ChefHat, ClipboardList, LayoutGrid, Sparkles, Utensils } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { usePos } from '../context/PosContext.jsx';
 
 export default function PosNavigation() {
-    const { can, state, patch, loadHolds, categoryCounts } = usePos();
+    const { can, state, patch, loadHolds, categoryCounts, catalogAddons } = usePos();
     const categories = [
         { id: 'all', name: 'All Items' },
         ...(state.catalog?.deals?.length ? [{ id: 'deals', name: 'Deals' }] : []),
+        ...(catalogAddons?.length ? [{ id: 'addons', name: 'Add-ons' }] : []),
         ...(state.catalog?.categories || []),
     ];
     return (
@@ -19,7 +20,12 @@ export default function PosNavigation() {
             <nav aria-label="Product categories" className="afc-pos-sidebar-categories">
                 {categories.map((category) => (
                     <button type="button" key={category.id} aria-pressed={state.categoryId === category.id} className={state.categoryId === category.id ? 'is-active' : ''} title={category.name} onClick={() => patch({ categoryId: category.id, query: '' })}>
-                        <span className="afc-pos-category-symbol" aria-hidden="true">{category.id === 'all' ? <LayoutGrid size={21} /> : category.id === 'deals' ? <BadgePercent size={21} /> : category.name.slice(0, 2).toUpperCase()}</span>
+                        <span className="afc-pos-category-symbol" aria-hidden="true">
+                            {category.id === 'all' ? <LayoutGrid size={21} />
+                                : category.id === 'deals' ? <BadgePercent size={21} />
+                                    : category.id === 'addons' ? <Sparkles size={21} />
+                                        : category.name.slice(0, 2).toUpperCase()}
+                        </span>
                         <span className="afc-pos-category-name">{category.name}</span>
                         <b>{categoryCounts[category.id] || 0}</b>
                     </button>

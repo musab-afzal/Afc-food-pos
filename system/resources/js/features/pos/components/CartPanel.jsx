@@ -1,9 +1,8 @@
-import { useMemo, useState } from 'react';
-import { Banknote, ChevronDown, ChevronRight, CreditCard, GitFork, Map as MapIcon, Minus, Pause, Plus, Printer, QrCode, ShoppingBag, Tag, Trash2, Utensils, Wallet } from 'lucide-react';
+import { Banknote, ChevronRight, CreditCard, GitFork, Map as MapIcon, Minus, Pause, Plus, Printer, QrCode, ShoppingBag, Tag, Trash2, Utensils, Wallet } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { usePos } from '../context/PosContext.jsx';
-import { cartItemLabel, money, toCents } from '../utils/cart.js';
+import { cartItemLabel, money } from '../utils/cart.js';
 
 function paymentIcon(method) {
     const name = `${method.code} ${method.name}`.toLowerCase();
@@ -14,16 +13,7 @@ function paymentIcon(method) {
 }
 
 export default function CartPanel() {
-    const { state, patch, totals, can, changeQuantity, removeItem, addAddonToLastItem, editItem, openPayment, holdOrder, clearCart } = usePos();
-    const [addonsOpen, setAddonsOpen] = useState(false);
-    // The catalog only exposes add-ons per dish unless a global `addons` list is provided.
-    const catalogAddons = useMemo(() => {
-        if (Array.isArray(state.catalog?.addons) && state.catalog.addons.length) return state.catalog.addons;
-        const unique = new globalThis.Map();
-        (state.catalog?.dishes || []).forEach((dish) => (dish.addons || []).forEach((addon) => { if (!unique.has(addon.id)) unique.set(addon.id, addon); }));
-        return [...unique.values()];
-    }, [state.catalog]);
-    const lastItem = state.cart[state.cart.length - 1];
+    const { state, patch, totals, can, changeQuantity, removeItem, editItem, openPayment, holdOrder, clearCart } = usePos();
     const allowDiscounts = state.catalog?.settings?.allow_discounts !== false;
     const methods = (state.catalog?.payment_methods || []).filter((method) => state.online || method.works_offline);
     const selectedMethod = methods.find((method) => Number(method.id) === Number(state.selectedPaymentMethod)) || methods.find((method) => method.code === 'cash') || methods[0];
@@ -63,18 +53,6 @@ export default function CartPanel() {
                         </article>
                     )) : <div className="afc-pos-empty"><span className="afc-pos-empty-cart"><ShoppingBag size={32} strokeWidth={1.5} /></span><strong>Your order starts here</strong><p>Add something delicious from the menu.</p></div>}
                 </div>
-                {catalogAddons.length > 0 && <div className="afc-pos-addons">
-                    <button type="button" aria-expanded={addonsOpen} aria-controls="pos-addons-list" onClick={() => setAddonsOpen((open) => !open)}><span>Add-ons ({catalogAddons.length})</span><ChevronDown size={17} style={{ transform: addonsOpen ? 'rotate(180deg)' : undefined }} /></button>
-                    {addonsOpen && <>
-                        <p className="afc-pos-addons-hint">{lastItem && !lastItem.isDeal ? `Adds to: ${lastItem.dish.name}` : 'Add a dish first, then tap an add-on.'}</p>
-                        <div id="pos-addons-list" className="afc-pos-addons-list pos-scroll">
-                            {catalogAddons.map((addon) => {
-                                const applies = Boolean(lastItem && !lastItem.isDeal && (lastItem.dish.addons || []).some((a) => Number(a.id) === Number(addon.id)));
-                                return <button type="button" key={addon.id} className={lastItem && !applies ? 'is-muted' : ''} disabled={state.paying} onClick={() => addAddonToLastItem(addon)}><Plus size={13} />{addon.name}{Number(addon.price) > 0 && <span>{money(toCents(addon.price))}</span>}</button>;
-                            })}
-                        </div>
-                    </>}
-                </div>}
                 <div className="afc-pos-order-summary">
                     <dl className="afc-pos-totals"><div><dt>Subtotal</dt><dd>{money(totals.subtotal)}</dd></div><div><dt>Tax</dt><dd>{money(totals.tax)}</dd></div>
                         {totals.serviceCharge > 0 && <div><dt>Service</dt><dd>{money(totals.serviceCharge)}</dd></div>}
