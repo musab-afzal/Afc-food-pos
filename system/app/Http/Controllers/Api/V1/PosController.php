@@ -24,7 +24,12 @@ class PosController extends Controller
     {
         $dishes = Dish::query()
             ->where('is_active', true)->where('is_available', true)->where('pos_enabled', true)
-            ->with(['variants' => fn ($query) => $query->where('is_active', true)->orderBy('sort_order'), 'addons' => fn ($query) => $query->where('is_active', true)])
+            ->with([
+                'variants' => fn ($query) => $query->where('is_active', true)->orderBy('sort_order'),
+                'variants.recipe.items.inventoryItem:id,name,unit,is_active',
+                'addons' => fn ($query) => $query->where('is_active', true),
+                'recipe.items.inventoryItem:id,name,unit,is_active',
+            ])
             ->orderBy('sort_order')->get();
 
         return response()->json(['success' => true, 'data' => [
@@ -78,6 +83,9 @@ class PosController extends Controller
                 'receipt_show_tax' => (bool) $settings->get('receipt.show_tax', true),
                 'receipt_show_cashier' => (bool) $settings->get('receipt.show_cashier', true),
                 'receipt_show_customer' => (bool) $settings->get('receipt.show_customer', true),
+                'receipt_show_review_qr' => (bool) $settings->get('receipt.show_review_qr', false),
+                'receipt_google_review_url' => (string) $settings->get('receipt.google_review_url', ''),
+                'receipt_website_review_url' => (string) $settings->get('receipt.website_review_url', $settings->get('restaurant.website', '')),
             ],
             'cached_at' => now()->toIso8601String(),
         ]]);

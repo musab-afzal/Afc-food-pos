@@ -268,6 +268,19 @@
 .afc-checkout-payable > svg { flex-shrink: 0; color: #ff8614; }
 .afc-checkout-payable p { color: #657680; font-size: 20px; font-weight: 650; }
 .afc-checkout-payable strong { color: #062c44; font-size: clamp(32px, 3.2vw, 50px); font-weight: 850; line-height: 1.25; }
+.afc-checkout-discount-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+.afc-checkout-discount-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    min-height: 44px; padding: 0 16px; border-radius: 12px;
+    border: 1px dashed #ff9a3c; background: #fff7ef; color: #c45a00;
+    font-size: 14px; font-weight: 800;
+}
+.afc-checkout-discount-btn:hover:enabled { background: #ffeedd; }
+.afc-checkout-discount-clear {
+    min-height: 44px; padding: 0 14px; border-radius: 12px;
+    border: 1px solid #d6dee6; background: #fff; color: #5d6f84;
+    font-size: 13px; font-weight: 700;
+}
 .afc-checkout-methods { min-width: 0; border: 0; padding: 0; }
 .afc-checkout-methods legend { margin-bottom: 12px; font-size: 19px; font-weight: 800; }
 .afc-checkout-methods > div { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }

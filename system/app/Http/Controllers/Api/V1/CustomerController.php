@@ -122,11 +122,13 @@ class CustomerController extends Controller
 
         $sales = Sale::query()
             ->where('customer_id', $customer->id)
+            ->with(['order:id,payment_status'])
             ->orderByDesc('sold_at')
             ->orderByDesc('id')
             ->limit($perPage)
             ->get([
                 'id',
+                'order_id',
                 'invoice_number',
                 'status',
                 'grand_total',
@@ -134,15 +136,27 @@ class CustomerController extends Controller
                 'sold_at',
                 'created_at',
             ])
-            ->map(fn (Sale $sale) => [
-                'type' => 'sale',
-                'id' => $sale->id,
-                'reference' => $sale->invoice_number,
-                'status' => $sale->status,
-                'amount' => $sale->grand_total,
-                'points' => null,
-                'occurred_at' => $sale->sold_at ?? $sale->created_at,
-            ]);
+            ->map(function (Sale $sale) {
+                $due = max(0, (float) $sale->grand_total - (float) $sale->paid_total);
+                $paymentStatus = $sale->order?->payment_status;
+                if (! $paymentStatus) {
+                    $paymentStatus = $due > 0.009 ? 'unpaid' : 'paid';
+                }
+
+                return [
+                    'type' => 'sale',
+                    'id' => $sale->id,
+                    'label' => $sale->invoice_number,
+                    'reference' => $sale->invoice_number,
+                    'status' => $sale->status,
+                    'payment_status' => $paymentStatus,
+                    'amount' => $sale->grand_total,
+                    'due' => $due,
+                    'balance_delta' => $due > 0.009 ? $due : null,
+                    'points' => null,
+                    'occurred_at' => $sale->sold_at ?? $sale->created_at,
+                ];
+            });
 
         $loyalty = LoyaltyTransaction::query()
             ->where('customer_id', $customer->id)
@@ -153,9 +167,12 @@ class CustomerController extends Controller
             ->map(fn (LoyaltyTransaction $tx) => [
                 'type' => 'loyalty',
                 'id' => $tx->id,
+                'label' => 'Loyalty · '.$tx->type,
                 'reference' => $tx->type,
                 'status' => null,
+                'payment_status' => null,
                 'amount' => null,
+                'due' => null,
                 'points' => $tx->points,
                 'balance_after' => $tx->balance_after,
                 'notes' => $tx->notes,
@@ -167,9 +184,16 @@ class CustomerController extends Controller
             ->values()
             ->take($perPage);
 
+        $outstanding = (float) Sale::query()
+            ->where('customer_id', $customer->id)
+            ->selectRaw('COALESCE(SUM(GREATEST(grand_total - paid_total, 0)), 0) as outstanding')
+            ->value('outstanding');
+
         return $this->success('Customer ledger retrieved.', [
             'customer_id' => $customer->id,
+            'balance' => $customer->balance,
             'loyalty_points' => $customer->loyalty_points,
+            'outstanding' => $outstanding,
             'entries' => $entries,
         ]);
     }

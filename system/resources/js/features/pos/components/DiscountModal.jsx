@@ -32,7 +32,7 @@ export default function DiscountModal() {
     }
 
     return (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-ink/50 p-4" onClick={() => patch({ discountOpen: false })}>
+        <div className="fixed inset-0 z-[80] grid place-items-center bg-ink/50 p-4" onClick={() => patch({ discountOpen: false })}>
             <div className="w-full max-w-md card-panel p-5" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center justify-between">
                     <h2 className="text-xl font-semibold">Discount</h2>

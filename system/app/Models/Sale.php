@@ -21,7 +21,7 @@ class Sale extends Model
     /**
      * Receipt extras stored as a JSON suffix on `notes`: processing_minutes, custom_slip_message, delivery_name.
      *
-     * @return array{processing_minutes: ?int, custom_slip_message: ?string, delivery_name: ?string}
+     * @return array{processing_minutes: ?int, custom_slip_message: ?string, delivery_name: ?string, delivery_phone: ?string}
      */
     public function posMeta(): array
     {
@@ -37,6 +37,7 @@ class Sale extends Model
             'processing_minutes' => isset($meta['processing_minutes']) ? (int) $meta['processing_minutes'] : null,
             'custom_slip_message' => $meta['custom_slip_message'] ?? null,
             'delivery_name' => $meta['delivery_name'] ?? null,
+            'delivery_phone' => $meta['delivery_phone'] ?? null,
         ];
     }
 

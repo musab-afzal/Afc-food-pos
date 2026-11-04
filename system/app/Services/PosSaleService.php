@@ -109,7 +109,18 @@ class PosSaleService
                 }
 
                 $lineTaxCents = (int) round(($grossCents - $discountCents) * ((float) $dish->tax_percent / 100));
-                $unitCostCents = $this->recipeUnitCost($variant?->recipe ?? $dish->recipe, $quantity, $inventoryConsumption);
+                $removedIngredientIds = collect($requestedItem['removed_ingredient_ids'] ?? [])
+                    ->map(fn ($id) => (int) $id)
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all();
+                $unitCostCents = $this->recipeUnitCost(
+                    $variant?->recipe ?? $dish->recipe,
+                    $quantity,
+                    $inventoryConsumption,
+                    $removedIngredientIds,
+                );
 
                 $subtotalCents += $grossCents;
                 $itemDiscountCents += $discountCents;
@@ -236,6 +247,7 @@ class PosSaleService
                 'processing_minutes' => isset($payload['processing_minutes']) ? (int) $payload['processing_minutes'] : null,
                 'custom_slip_message' => filled($payload['custom_slip_message'] ?? null) ? trim((string) $payload['custom_slip_message']) : null,
                 'delivery_name' => $deliveryName,
+                'delivery_phone' => filled($payload['delivery_phone'] ?? null) ? trim((string) $payload['delivery_phone']) : null,
             ]);
 
             $this->consumeInventory($cashier, $inventoryConsumption, $payload['uuid']);
@@ -277,9 +289,18 @@ class PosSaleService
                 if ($loyaltyPoints > 0) {
                     $this->loyalty->record($cashier, $customerId, 'redeem', -$loyaltyPoints, "Redeemed on {$sale->invoice_number}", $sale);
                 }
-                $earned = $this->loyaltyEarnPoints($grandTotalCents);
-                if ($earned > 0) {
-                    $this->loyalty->record($cashier, $customerId, 'earn', $earned, "Earned on {$sale->invoice_number}", $sale);
+                // Unpaid / pending sales add the outstanding balance to the customer ledger.
+                $outstandingCents = max(0, $grandTotalCents - $paidCents);
+                if ($isDeferredPayment && $outstandingCents > 0) {
+                    Customer::query()->whereKey($customerId)->lockForUpdate()->increment(
+                        'balance',
+                        $this->money($outstandingCents),
+                    );
+                } elseif (! $isDeferredPayment) {
+                    $earned = $this->loyaltyEarnPoints($grandTotalCents);
+                    if ($earned > 0) {
+                        $this->loyalty->record($cashier, $customerId, 'earn', $earned, "Earned on {$sale->invoice_number}", $sale);
+                    }
                 }
             }
 
@@ -527,14 +548,20 @@ class PosSaleService
 
     /**
      * Cost of one unit from its recipe; adds the stock used by $quantity units to $inventoryConsumption.
+     * Inventory IDs in $excludeInventoryIds (removed ingredients) are skipped.
      *
      * @param  array<int, float>  $inventoryConsumption
+     * @param  array<int, int>  $excludeInventoryIds
      */
-    private function recipeUnitCost(?Recipe $recipe, int $quantity, array &$inventoryConsumption): int
+    private function recipeUnitCost(?Recipe $recipe, int $quantity, array &$inventoryConsumption, array $excludeInventoryIds = []): int
     {
         $unitCostCents = 0;
+        $excluded = array_fill_keys(array_map('intval', $excludeInventoryIds), true);
 
         foreach ($recipe?->items ?? [] as $recipeItem) {
+            if (isset($excluded[(int) $recipeItem->inventory_item_id])) {
+                continue;
+            }
             $stockQuantity = $this->convertQuantity((float) $recipeItem->quantity, $recipeItem->unit, $recipeItem->inventoryItem->unit);
             $stockQuantity *= 1 + ((float) $recipeItem->wastage_percent / 100);
             $inventoryConsumption[$recipeItem->inventory_item_id] = ($inventoryConsumption[$recipeItem->inventory_item_id] ?? 0) + $stockQuantity * $quantity;

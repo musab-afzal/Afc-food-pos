@@ -30,11 +30,13 @@ class PosCatalogResource extends JsonResource
             'image_url' => $this->image,
             'has_variants' => $this->variants->isNotEmpty(),
             'has_addons' => $this->addons->isNotEmpty(),
+            'ingredients' => $this->recipeIngredients($this->recipe),
             'variants' => $this->variants->map(fn ($variant) => [
                 'id' => $variant->id,
                 'name' => $variant->name,
                 'sku' => $variant->sku,
                 'price' => $variant->price,
+                'ingredients' => $this->recipeIngredients($variant->recipe),
             ]),
             'addons' => $this->addons->map(fn ($addon) => [
                 'id' => $addon->id,
@@ -42,5 +44,23 @@ class PosCatalogResource extends JsonResource
                 'price' => $addon->price,
             ]),
         ];
+    }
+
+    /** Unique inventory items from a recipe for POS "remove ingredient" choices. */
+    private function recipeIngredients($recipe): array
+    {
+        if (! $recipe) {
+            return [];
+        }
+
+        return $recipe->items
+            ->filter(fn ($item) => $item->inventoryItem && $item->inventoryItem->is_active !== false)
+            ->unique('inventory_item_id')
+            ->values()
+            ->map(fn ($item) => [
+                'id' => $item->inventory_item_id,
+                'name' => $item->inventoryItem->name,
+            ])
+            ->all();
     }
 }

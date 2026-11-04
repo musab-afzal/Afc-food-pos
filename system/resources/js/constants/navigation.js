@@ -215,6 +215,7 @@ export const navigation = [
                 ],
             },
             { to: '/admin/bulk-data', label: 'Bulk Data', icon: Database, superAdminOnly: true },
+            { to: '/admin/backups', label: 'Backups', icon: Database, superAdminOnly: true, permission: 'system.backup' },
         ],
     },
     {

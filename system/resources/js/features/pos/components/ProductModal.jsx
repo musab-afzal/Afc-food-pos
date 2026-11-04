@@ -3,12 +3,29 @@ import { useEffect, useMemo, useState } from 'react';
 import { usePos } from '../context/PosContext.jsx';
 import { money, toCents } from '../utils/cart.js';
 
+function ingredientPool(dish, variant, multiVariant) {
+    if (multiVariant) {
+        const fromDish = dish.ingredients || [];
+        if (fromDish.length) return fromDish;
+        const unique = new Map();
+        (dish.variants || []).forEach((row) => {
+            (row.ingredients || []).forEach((ingredient) => {
+                if (!unique.has(ingredient.id)) unique.set(ingredient.id, ingredient);
+            });
+        });
+        return [...unique.values()];
+    }
+    if (variant?.ingredients?.length) return variant.ingredients;
+    return dish.ingredients || [];
+}
+
 export default function ProductModal() {
     const { state, patch, saveCustomized, addVariantLines } = usePos();
     const draft = state.customizing;
     const [variant, setVariant] = useState(null);
     const [variantQtys, setVariantQtys] = useState({});
     const [addonIds, setAddonIds] = useState([]);
+    const [removedIngredients, setRemovedIngredients] = useState([]);
     const [quantity, setQuantity] = useState(1);
     const [notes, setNotes] = useState('');
 
@@ -19,6 +36,7 @@ export default function ProductModal() {
     useEffect(() => {
         if (!draft) return;
         setAddonIds((draft.addonIds || []).map(Number));
+        setRemovedIngredients(draft.removedIngredients || []);
         setNotes(draft.notes || '');
         if (state.editingKey) {
             setVariant(draft.variant || variants[0] || null);
@@ -39,6 +57,11 @@ export default function ProductModal() {
         setVariantQtys({});
         setQuantity(draft.quantity || 1);
     }, [draft, state.editingKey]);
+
+    const ingredients = useMemo(
+        () => (draft ? ingredientPool(draft.dish, variant, multiVariant) : []),
+        [draft, variant, multiVariant],
+    );
 
     const lineTotal = useMemo(() => {
         if (!draft) return 0;
@@ -71,6 +94,15 @@ export default function ProductModal() {
         setAddonIds((ids) => (ids.map(Number).includes(numeric) ? ids.filter((x) => Number(x) !== numeric) : [...ids, numeric]));
     }
 
+    function toggleRemoved(ingredient) {
+        const numeric = Number(ingredient.id);
+        setRemovedIngredients((current) => (
+            current.some((row) => Number(row.id) === numeric)
+                ? current.filter((row) => Number(row.id) !== numeric)
+                : [...current, { id: numeric, name: ingredient.name }]
+        ));
+    }
+
     function setQtyForVariant(id, next) {
         setVariantQtys((current) => ({ ...current, [id]: Math.max(0, next) }));
     }
@@ -81,10 +113,10 @@ export default function ProductModal() {
             const lines = variants
                 .map((row) => ({ variant: row, quantity: Number(variantQtys[row.id] || 0) }))
                 .filter((row) => row.quantity > 0);
-            addVariantLines({ dish, lines, addonIds, notes });
+            addVariantLines({ dish, lines, addonIds, notes, removedIngredients });
             return;
         }
-        saveCustomized({ dish, variant, addonIds, quantity, notes });
+        saveCustomized({ dish, variant, addonIds, quantity, notes, removedIngredients });
     }
 
     return (
@@ -175,13 +207,41 @@ export default function ProductModal() {
                         </div>
                     )}
 
+                    {ingredients.length > 0 && (
+                        <div>
+                            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink/45">Remove ingredients</p>
+                            <p className="mb-2 text-xs text-ink/40">Tap to leave out. Kitchen will see “No …” on the ticket.</p>
+                            <div className="grid gap-2">
+                                {ingredients.map((ingredient) => {
+                                    const selected = removedIngredients.some((row) => Number(row.id) === Number(ingredient.id));
+                                    return (
+                                        <button
+                                            key={ingredient.id}
+                                            type="button"
+                                            onClick={() => toggleRemoved(ingredient)}
+                                            className={`flex items-center justify-between rounded-xl border px-3 py-3 text-sm ${selected ? 'border-orange-400 bg-orange-50 text-orange-900' : 'border-ink/10'}`}
+                                        >
+                                            <span className="flex items-center gap-2">
+                                                {selected ? <Check size={16} className="text-orange-500" /> : <CircleDot size={16} className="text-ink/25" />}
+                                                {selected ? `No ${ingredient.name}` : ingredient.name}
+                                            </span>
+                                            <span className="text-xs font-semibold uppercase tracking-wide text-ink/40">
+                                                {selected ? 'Removed' : 'Remove'}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
                     <div>
                         <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink/45">Special instructions</p>
                         <textarea
                             value={notes}
                             onChange={(e) => setNotes(e.target.value)}
                             rows={2}
-                            placeholder="No onion, less spicy…"
+                            placeholder="Less spicy, extra sauce…"
                             className="w-full rounded-xl border border-ink/10 px-3 py-2.5 text-sm outline-none focus:border-herb/40"
                         />
                     </div>

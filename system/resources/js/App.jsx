@@ -37,6 +37,7 @@ import RoleDetailPage from './features/roles/pages/RoleDetailPage.jsx';
 import RoleFormPage from './features/roles/pages/RoleFormPage.jsx';
 import RolesPage from './features/roles/pages/RolesPage.jsx';
 import UserAccessPage from './features/roles/pages/UserAccessPage.jsx';
+import BackupPage from './pages/admin/BackupPage.jsx';
 import BulkDataPage from './pages/admin/BulkDataPage.jsx';
 import ShiftsPage from './pages/staff/ShiftsPage.jsx';
 import StaffPage from './pages/staff/StaffPage.jsx';
@@ -194,6 +195,7 @@ export default function App() {
                     <Route path="/permissions" element={<SuperAdminRoute><PermissionsCatalogPage /></SuperAdminRoute>} />
                     <Route path="/user-access" element={<SuperAdminRoute><UserAccessPage /></SuperAdminRoute>} />
                     <Route path="/admin/bulk-data" element={<SuperAdminRoute><BulkDataPage /></SuperAdminRoute>} />
+                    <Route path="/admin/backups" element={<SuperAdminRoute><BackupPage /></SuperAdminRoute>} />
                     <Route path="/staff/roles" element={<Navigate to="/roles" replace />} />
                     <Route path="/staff/permissions" element={<Navigate to="/permissions" replace />} />
                     <Route path="/settings/taxes" element={<ProtectedRoute permission="settings.view"><TaxesPage /></ProtectedRoute>} />

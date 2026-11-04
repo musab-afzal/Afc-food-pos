@@ -106,6 +106,9 @@ class SaleController extends Controller
                 'show_tax' => (bool) $settings->get('receipt.show_tax', true),
                 'show_cashier' => (bool) $settings->get('receipt.show_cashier', true),
                 'show_customer' => (bool) $settings->get('receipt.show_customer', true),
+                'show_review_qr' => (bool) $settings->get('receipt.show_review_qr', false),
+                'google_review_url' => (string) $settings->get('receipt.google_review_url', ''),
+                'website_review_url' => (string) $settings->get('receipt.website_review_url', $settings->get('restaurant.website', '')),
             ],
             'currency' => [
                 'code' => (string) $settings->get('currency.code', 'PKR'),

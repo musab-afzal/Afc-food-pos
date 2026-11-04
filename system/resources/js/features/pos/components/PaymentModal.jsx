@@ -18,6 +18,8 @@ export default function PaymentModal() {
     const [localBusy, setLocalBusy] = useState(false);
     const dialogRef = useRef(null);
     const methods = (state.catalog?.payment_methods || []).filter((method) => state.online || method.works_offline);
+    const allowDiscounts = state.catalog?.settings?.allow_discounts !== false;
+    const discountCents = (totals.discountCents || 0) + (totals.loyaltyDiscountCents || 0);
     const paid = state.payments.reduce((sum, payment) => sum + toCents(payment.amount), 0);
     const due = Math.round(Number(totals.total) || 0);
     const remaining = Math.max(0, due - paid);
@@ -26,6 +28,7 @@ export default function PaymentModal() {
     const split = state.payments.length > 1;
     const primary = methods.find((method) => Number(method.id) === Number(state.payments[0]?.payment_method_id));
     const isCash = primary?.code === 'cash' || (String(primary?.name || '').toLowerCase().includes('cash') && !String(primary?.name || '').toLowerCase().includes('jazz'));
+    const hasCustomer = Boolean(state.customerId || state.selectedCustomer?.id);
 
     const quickAmounts = useMemo(() => {
         const amount = due / 100;
@@ -98,6 +101,18 @@ export default function PaymentModal() {
                 <div className="afc-checkout-body">
                     <div className="afc-checkout-entry">
                         <div className="afc-checkout-payable"><HandPlatter size={66} strokeWidth={1.5} /><div><p>Payable Amount</p><strong>{money(due)}</strong></div></div>
+                        {allowDiscounts && (
+                            <div className="afc-checkout-discount-row">
+                                <button type="button" disabled={busy} className="afc-checkout-discount-btn" onClick={() => patch({ discountOpen: true })}>
+                                    <Tag size={18} /> {discountCents > 0 ? `Discount −${money(discountCents)}` : 'Give discount'}
+                                </button>
+                                {discountCents > 0 && (
+                                    <button type="button" disabled={busy} className="afc-checkout-discount-clear" onClick={() => patch({ discountTotal: 0, couponCode: '', couponDiscount: 0, loyaltyPoints: 0 })}>
+                                        Clear
+                                    </button>
+                                )}
+                            </div>
+                        )}
                         <div className="afc-checkout-order-meta" aria-label="Order slip options">
                             {state.orderType === 'delivery' && (
                                 <div className="afc-checkout-meta-grid">
@@ -154,10 +169,36 @@ export default function PaymentModal() {
                         </div>
                     </aside>
                 </div>
-                <div className="afc-checkout-deferred" role="group" aria-label="Pay later options">
-                    <span>Not paying now?</span>
-                    <button type="button" disabled={busy || !methods.length || !state.payments.length} onClick={() => handleComplete('unpaid')}><Clock size={20} /> Unpaid</button>
-                    <button type="button" disabled={busy || !methods.length || !state.payments.length} onClick={() => handleComplete('pending')}><Hourglass size={20} /> Pending payment</button>
+                <div className="afc-checkout-deferred" role="group" aria-label="Pay later / ledger options">
+                    <span>Pay later (ledger)</span>
+                    <button
+                        type="button"
+                        disabled={busy || !methods.length}
+                        title={hasCustomer ? 'Save as unpaid on customer ledger' : 'Select or add a customer first'}
+                        onClick={() => {
+                            if (!hasCustomer) {
+                                patch({ checkoutError: 'Add a customer before marking unpaid — it posts to their ledger.' });
+                                return;
+                            }
+                            handleComplete('unpaid');
+                        }}
+                    >
+                        <Clock size={20} /> Unpaid / Ledger
+                    </button>
+                    <button
+                        type="button"
+                        disabled={busy || !methods.length}
+                        title={hasCustomer ? 'Save as pending on customer ledger' : 'Select or add a customer first'}
+                        onClick={() => {
+                            if (!hasCustomer) {
+                                patch({ checkoutError: 'Add a customer before pending payment — it posts to their ledger.' });
+                                return;
+                            }
+                            handleComplete('pending');
+                        }}
+                    >
+                        <Hourglass size={20} /> Pending payment
+                    </button>
                 </div>
                 <footer className="afc-checkout-footer"><button type="button" disabled={busy} className="afc-checkout-cancel" onClick={close}><CircleX size={28} /> Cancel</button><button type="button" disabled={busy || !methods.length || !state.payments.length} className="afc-checkout-complete" onClick={() => handleComplete('paid')}>{busy ? <Loader2 size={30} className="animate-spin" /> : <Printer size={32} />}{busy ? 'Processing...' : 'Complete & Print'}</button></footer>
             </section>

@@ -47,6 +47,11 @@ export default function CartPanel() {
                                     : (item.addons || []).length
                                         ? (item.addons || []).map((addon) => addon.name).join(' · ')
                                         : (item.variant ? money(item.unitCents) : 'Regular')}</p>
+                                {(item.removedIngredients || []).length > 0 && (
+                                    <p className="afc-pos-cart-variant text-[#E8711A]">
+                                        {(item.removedIngredients || []).map((row) => `No ${row.name}`).join(' · ')}
+                                    </p>
+                                )}
                                 {item.notes && <p className="afc-pos-cart-variant">{item.notes}</p>}
                                 <div className="afc-pos-cart-controls"><div className="afc-pos-quantity"><button type="button" aria-label={`Decrease ${item.dish.name} quantity`} onClick={() => changeQuantity(item.key, -1)}><Minus size={16} /></button><span>{item.quantity}</span><button type="button" aria-label={`Increase ${item.dish.name} quantity`} onClick={() => changeQuantity(item.key, 1)}><Plus size={16} /></button></div><button type="button" className="afc-pos-remove" aria-label={`Remove ${item.dish.name}`} onClick={() => removeItem(item.key)}><Trash2 size={17} /></button></div>
                             </div>

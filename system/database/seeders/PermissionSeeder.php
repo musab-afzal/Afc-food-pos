@@ -125,6 +125,7 @@ class PermissionSeeder extends Seeder
             'data.print_orders' => 'Danger Zone',
             'data.print_customers' => 'Danger Zone',
             'data.print_products' => 'Danger Zone',
+            'system.backup' => 'System',
         ];
 
         foreach ($permissionDefinitions as $slug => $module) {

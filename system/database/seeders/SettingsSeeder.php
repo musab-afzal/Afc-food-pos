@@ -68,6 +68,9 @@ class SettingsSeeder extends Seeder
             ['key' => 'receipt.show_tax', 'value' => '1', 'type' => 'boolean', 'group' => 'receipt'],
             ['key' => 'receipt.show_cashier', 'value' => '1', 'type' => 'boolean', 'group' => 'receipt'],
             ['key' => 'receipt.show_customer', 'value' => '1', 'type' => 'boolean', 'group' => 'receipt'],
+            ['key' => 'receipt.show_review_qr', 'value' => '0', 'type' => 'boolean', 'group' => 'receipt'],
+            ['key' => 'receipt.google_review_url', 'value' => '', 'type' => 'string', 'group' => 'receipt'],
+            ['key' => 'receipt.website_review_url', 'value' => '', 'type' => 'string', 'group' => 'receipt'],
             ['key' => 'receipt.auto_print', 'value' => '1', 'type' => 'boolean', 'group' => 'receipt'],
 
             ['key' => 'loyalty.enabled', 'value' => '1', 'type' => 'boolean', 'group' => 'loyalty'],

@@ -2,10 +2,28 @@ export const toCents = (value) => Math.round(Number(value || 0) * 100);
 export const money = (cents) => `Rs ${((Number(cents) || 0) / 100).toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 export const moneyLabel = () => 'PKR';
 
-export function lineKey(dishId, variantId, addonIds = [], notes = '') {
+export function removedIngredientKey(removedIngredients = []) {
+    return [...removedIngredients]
+        .map((row) => Number(row.id ?? row))
+        .filter((id) => Number.isFinite(id))
+        .sort((a, b) => a - b)
+        .join(',');
+}
+
+export function composeItemNotes(notes = '', removedIngredients = []) {
+    const removals = (removedIngredients || [])
+        .map((row) => String(row.name || '').trim())
+        .filter(Boolean)
+        .map((name) => (name.toLowerCase().startsWith('no ') ? name : `No ${name}`))
+        .join(', ');
+    return [removals, String(notes || '').trim()].filter(Boolean).join(' · ');
+}
+
+export function lineKey(dishId, variantId, addonIds = [], notes = '', removedIngredients = []) {
     const addons = [...addonIds].map(Number).filter((id) => Number.isFinite(id)).sort((a, b) => a - b).join(',');
     const variantKey = variantId == null || variantId === '' ? 0 : Number(variantId);
-    return `${Number(dishId)}:${Number.isFinite(variantKey) ? variantKey : 0}:${addons}:${String(notes || '').trim().toLowerCase()}`;
+    const removed = removedIngredientKey(removedIngredients);
+    return `${Number(dishId)}:${Number.isFinite(variantKey) ? variantKey : 0}:${addons}:${removed}:${String(notes || '').trim().toLowerCase()}`;
 }
 
 export function cartItemLabel(item) {
@@ -15,16 +33,20 @@ export function cartItemLabel(item) {
     return item.variant?.name ? `${name} (${item.variant.name})` : name;
 }
 
-export function buildCartItem(dish, variant = null, addonIds = [], quantity = 1, notes = '') {
+export function buildCartItem(dish, variant = null, addonIds = [], quantity = 1, notes = '', removedIngredients = []) {
     const selectedIds = [...addonIds].map(Number);
     const addons = (dish.addons || []).filter((addon) => selectedIds.includes(Number(addon.id)));
+    const removed = (removedIngredients || [])
+        .map((row) => ({ id: Number(row.id), name: String(row.name || '').trim() }))
+        .filter((row) => Number.isFinite(row.id) && row.name);
     const basePrice = variant?.price ?? dish.price ?? dish.base_price;
     const unitCents = toCents(basePrice) + addons.reduce((sum, addon) => sum + toCents(addon.price), 0);
     return {
-        key: lineKey(dish.id, variant?.id, selectedIds, notes),
+        key: lineKey(dish.id, variant?.id, selectedIds, notes, removed),
         dish,
         variant: variant || null,
         addons,
+        removedIngredients: removed,
         quantity: Math.max(1, quantity),
         unitCents,
         tax_percent: Number(dish.tax_percent || 0),
@@ -41,6 +63,7 @@ export function buildDealCartItem(deal, quantity = 1, notes = '') {
         dish: { id: `deal-${deal.id}`, name: deal.name, image: deal.components?.[0]?.image || null },
         variant: null,
         addons: [],
+        removedIngredients: [],
         quantity: Math.max(1, quantity),
         unitCents: toCents(deal.price),
         tax_percent: 0,
@@ -126,8 +149,9 @@ export function cartPayloadFromState(state) {
             dish_variant_id: item.variant?.id || null,
             quantity: item.quantity,
             discount: 0,
-            notes: item.notes || null,
+            notes: composeItemNotes(item.notes, item.removedIngredients) || null,
             addon_ids: item.addons.map((addon) => addon.id),
+            removed_ingredient_ids: (item.removedIngredients || []).map((row) => row.id),
             _ui: {
                 key: item.key,
                 unitCents: item.unitCents,
@@ -135,6 +159,8 @@ export function cartPayloadFromState(state) {
                 dish: item.dish,
                 variant: item.variant,
                 addons: item.addons,
+                removedIngredients: item.removedIngredients || [],
+                notes: item.notes || '',
             },
         })),
     };
@@ -155,16 +181,20 @@ export function restoreCartItems(payloadItems, dishes = []) {
                 dish: item._ui.dish,
                 variant: item._ui.variant,
                 addons: item._ui.addons || [],
+                removedIngredients: item._ui.removedIngredients || [],
                 quantity: item.quantity,
                 unitCents: item._ui.unitCents,
                 tax_percent: item._ui.tax_percent,
-                notes: item.notes || '',
+                notes: item._ui.notes ?? item.notes ?? '',
             };
         }
         const dish = dishes.find((d) => d.id === item.dish_id);
         if (!dish) return null;
         const variant = (dish.variants || []).find((v) => v.id === item.dish_variant_id) || null;
         const addonIds = item.addon_ids || [];
-        return buildCartItem(dish, variant, addonIds, item.quantity, item.notes || '');
+        const removedIds = new Set((item.removed_ingredient_ids || []).map(Number));
+        const pool = (variant?.ingredients?.length ? variant.ingredients : dish.ingredients) || [];
+        const removedIngredients = pool.filter((row) => removedIds.has(Number(row.id)));
+        return buildCartItem(dish, variant, addonIds, item.quantity, item.notes || '', removedIngredients);
     }).filter(Boolean);
 }

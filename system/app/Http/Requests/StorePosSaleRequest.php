@@ -35,7 +35,10 @@ class StorePosSaleRequest extends FormRequest
             'uuid' => ['required', 'uuid'],
             'order_type' => ['required', 'in:dine_in,takeaway,delivery'],
             'restaurant_table_id' => ['nullable', 'required_if:order_type,dine_in', 'exists:restaurant_tables,id'],
-            'customer_id' => ['nullable', 'exists:customers,id'],
+            'customer_id' => [
+                $deferred ? 'required' : 'nullable',
+                'exists:customers,id',
+            ],
             'notes' => ['nullable', 'string', 'max:2000'],
             'was_offline' => ['sometimes', 'boolean'],
             'discount_total' => ['sometimes', 'numeric', 'min:0'],
@@ -56,6 +59,8 @@ class StorePosSaleRequest extends FormRequest
             'items.*.notes' => ['nullable', 'string', 'max:500'],
             'items.*.addon_ids' => ['sometimes', 'array'],
             'items.*.addon_ids.*' => ['integer', 'distinct', 'exists:addons,id'],
+            'items.*.removed_ingredient_ids' => ['sometimes', 'array'],
+            'items.*.removed_ingredient_ids.*' => ['integer', 'distinct', 'exists:inventory_items,id'],
             'payments' => $deferred
                 ? ['required_unless:payment_status,unpaid,pending', 'nullable', 'array']
                 : ['required_unless:payment_status,unpaid,pending', 'array', 'min:1'],

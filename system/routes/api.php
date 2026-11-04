@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\AddonController;
 use App\Http\Controllers\Api\V1\AreaController;
 use App\Http\Controllers\Api\V1\AttendanceController;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\BackupController;
 use App\Http\Controllers\Api\V1\BrandController;
 use App\Http\Controllers\Api\V1\BulkDataController;
 use App\Http\Controllers\Api\V1\CashRegisterController;
@@ -226,6 +227,13 @@ Route::prefix('v1')->group(function (): void {
                 Route::get('print-orders', [BulkDataController::class, 'printOrders'])->middleware('permission:data.print_orders');
                 Route::get('print-customers', [BulkDataController::class, 'printCustomers'])->middleware('permission:data.print_customers');
                 Route::get('print-products', [BulkDataController::class, 'printProducts'])->middleware('permission:data.print_products');
+            });
+
+            Route::prefix('backups')->middleware('permission:system.backup')->group(function (): void {
+                Route::get('/', [BackupController::class, 'index']);
+                Route::post('/', [BackupController::class, 'store']);
+                Route::get('{backup}/download', [BackupController::class, 'download'])->where('backup', '.*');
+                Route::delete('{backup}', [BackupController::class, 'destroy'])->where('backup', '.*');
             });
         });
 

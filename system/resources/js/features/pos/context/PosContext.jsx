@@ -295,8 +295,15 @@ export function PosProvider({ children }) {
             patch({ tablePickerOpen: true });
             return;
         }
-        if ((dish.variants || []).length || (dish.addons || []).length) {
-            patch({ customizing: { dish, variant: null, addonIds: [], quantity: 1, notes: '' }, editingKey: null });
+        const hasIngredients = (dish.ingredients || []).length
+            || (dish.variants || []).some((row) => (row.ingredients || []).length);
+        if ((dish.variants || []).length || (dish.addons || []).length || hasIngredients) {
+            patch({
+                customizing: {
+                    dish, variant: null, addonIds: [], removedIngredients: [], quantity: 1, notes: '',
+                },
+                editingKey: null,
+            });
             return;
         }
         addOrMergeItem(buildCartItem(dish));
@@ -322,8 +329,8 @@ export function PosProvider({ children }) {
     }, [state.query, state.catalog, chooseDish, patch]);
 
     const saveCustomized = useCallback((payload) => {
-        const { dish, variant, addonIds, quantity, notes } = payload;
-        const item = buildCartItem(dish, variant, addonIds, quantity, notes);
+        const { dish, variant, addonIds, quantity, notes, removedIngredients = [] } = payload;
+        const item = buildCartItem(dish, variant, addonIds, quantity, notes, removedIngredients);
         if (state.editingKey) {
             patch({
                 cart: state.cart.map((row) => (row.key === state.editingKey ? item : row)),
@@ -337,11 +344,11 @@ export function PosProvider({ children }) {
 
     /** Add one cart line per selected variation so different prices stay separate. */
     const addVariantLines = useCallback((payload) => {
-        const { dish, lines = [], addonIds = [], notes = '' } = payload;
+        const { dish, lines = [], addonIds = [], notes = '', removedIngredients = [] } = payload;
         let nextCart = [...stateRef.current.cart];
         lines.forEach(({ variant, quantity }) => {
             if (!variant || Number(quantity) < 1) return;
-            const item = buildCartItem(dish, variant, addonIds, quantity, notes);
+            const item = buildCartItem(dish, variant, addonIds, quantity, notes, removedIngredients);
             const existing = nextCart.find((row) => row.key === item.key);
             nextCart = existing
                 ? nextCart.map((row) => (row.key === item.key ? { ...row, quantity: row.quantity + item.quantity } : row))
@@ -373,7 +380,7 @@ export function PosProvider({ children }) {
             return false;
         }
         const addons = [...last.addons, { id: addon.id, name: addon.name, price: addon.price }];
-        const key = lineKey(last.dish.id, last.variant?.id, addons.map((a) => a.id), last.notes);
+        const key = lineKey(last.dish.id, last.variant?.id, addons.map((a) => a.id), last.notes, last.removedIngredients || []);
         const updated = { ...last, addons, key, unitCents: last.unitCents + toCents(addon.price) };
         const rest = cart.slice(0, -1);
         const twin = rest.find((row) => row.key === key);
@@ -394,6 +401,7 @@ export function PosProvider({ children }) {
                 dish: item.dish,
                 variant: item.variant,
                 addonIds: item.addons.map((a) => a.id),
+                removedIngredients: item.removedIngredients || [],
                 quantity: item.quantity,
                 notes: item.notes || '',
             },
@@ -525,11 +533,6 @@ export function PosProvider({ children }) {
         const requestedStatus = options?.paymentStatus ?? current.paymentStatus;
         const paymentStatus = PAYMENT_STATUSES.includes(requestedStatus) ? requestedStatus : 'paid';
         const deferred = paymentStatus !== 'paid';
-        // Unpaid / pending sales are recorded with nothing collected now.
-        const salePayments = deferred
-            ? (current.payments || []).slice(0, 1).map((payment) => ({ ...payment, amount: '0' }))
-            : (current.payments || []);
-        const paid = salePayments.reduce((sum, payment) => sum + toCents(payment.amount), 0);
         const due = Math.round(Number(currentTotals.total) || 0);
         const processing = String(current.processingMinutes ?? '').trim();
         const processingMinutes = processing !== '' && Number.isFinite(Number(processing)) ? Math.max(0, Math.round(Number(processing))) : null;
@@ -541,6 +544,7 @@ export function PosProvider({ children }) {
             processingMinutes,
             customSlipMessage: String(current.customSlipMessage || '').trim(),
             paymentStatus,
+            customer: current.selectedCustomer || null,
         };
 
         const fail = (message) => {
@@ -552,9 +556,25 @@ export function PosProvider({ children }) {
         if (!current.cart.length) return fail('Cart is empty.');
         if (current.orderType === 'dine_in' && !current.tableId) return fail('Select a table for dine-in.');
         if (!methods.length) return fail('No payment methods available. Check Settings → Payment methods.');
-        if (!current.payments.length || current.payments.some((p) => !Number(p.payment_method_id))) {
+        if (deferred && !current.customerId) {
+            return fail('Select or add a customer for unpaid / pay-later (ledger) sales.');
+        }
+
+        let workingPayments = [...(current.payments || [])];
+        if (!deferred && (!workingPayments.length || workingPayments.some((p) => !Number(p.payment_method_id)))) {
             return fail('Choose a payment method.');
         }
+        if (deferred && (!workingPayments.length || workingPayments.some((p) => !Number(p.payment_method_id)))) {
+            const fallbackMethod = methods[0];
+            if (!fallbackMethod) return fail('Choose a payment method.');
+            workingPayments = [{ payment_method_id: Number(fallbackMethod.id), amount: '0', reference: '' }];
+        }
+
+        // Unpaid / pending sales are recorded with nothing collected now.
+        const salePayments = deferred
+            ? workingPayments.slice(0, 1).map((payment) => ({ ...payment, amount: '0' }))
+            : workingPayments;
+        const paid = salePayments.reduce((sum, payment) => sum + toCents(payment.amount), 0);
         const missingRef = !deferred && current.payments.find((payment) => {
             const method = methods.find((m) => Number(m.id) === Number(payment.payment_method_id));
             return Boolean(method?.requires_reference) && !String(payment.reference || '').trim();
