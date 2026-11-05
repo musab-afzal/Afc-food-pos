@@ -110,6 +110,35 @@ export default function UserAccessPage() {
         }
     }
 
+    async function toggleAccountStatus(row) {
+        const isActive = row.is_active && row.status === 'active';
+        const nextStatus = isActive ? 'inactive' : 'active';
+        const label = nextStatus === 'active' ? 'activate' : 'deactivate';
+
+        if (authUser?.id === row.id && nextStatus === 'inactive') {
+            toast.error('You cannot deactivate your own account.');
+            return;
+        }
+
+        const ok = window.confirm(
+            nextStatus === 'active'
+                ? `Activate login for ${row.name}?`
+                : `Deactivate login for ${row.name}? They will be signed out immediately.`,
+        );
+        if (!ok) return;
+
+        setBusy(true);
+        try {
+            await roleApi.setUserStatus(row.id, nextStatus);
+            toast.success(`User ${label}d`);
+            await load();
+        } catch (error) {
+            toast.error(error.message);
+        } finally {
+            setBusy(false);
+        }
+    }
+
     function openAddUser() {
         const nextId = `EMP-${String(Date.now()).slice(-6)}`;
         setAddForm({ ...emptyUserForm, employee_id: nextId });
@@ -162,7 +191,7 @@ export default function UserAccessPage() {
         <div>
             <PageHeader
                 title="User Access"
-                description="Create users, assign roles, and review effective permissions."
+                description="Create users, assign roles, activate/deactivate accounts, and review permissions."
                 breadcrumbs={['System Administration', 'User Access']}
                 actions={(
                     <button type="button" onClick={openAddUser} className="flex items-center gap-2 btn-primary">
@@ -213,16 +242,29 @@ export default function UserAccessPage() {
                         key: 'actions',
                         label: 'Actions',
                         className: 'text-right',
-                        render: (row) => (
-                            <div className="flex justify-end gap-2">
-                                <button type="button" className="rounded-lg px-2 py-1.5 text-xs font-medium hover:bg-ink/5" onClick={() => openAssign(row)}>
-                                    Change Role
-                                </button>
-                                <button type="button" className="rounded-lg px-2 py-1.5 text-xs font-medium hover:bg-ink/5" onClick={() => viewEffective(row)}>
-                                    Effective Permissions
-                                </button>
-                            </div>
-                        ),
+                        render: (row) => {
+                            const isActive = row.is_active && row.status === 'active';
+                            const isSelf = authUser?.id === row.id;
+                            return (
+                                <div className="flex flex-wrap justify-end gap-2">
+                                    <button
+                                        type="button"
+                                        disabled={busy || (isSelf && isActive)}
+                                        className={`rounded-lg px-2 py-1.5 text-xs font-semibold ${isActive ? 'bg-rose-50 text-rose-700 hover:bg-rose-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'} disabled:opacity-40`}
+                                        onClick={() => toggleAccountStatus(row)}
+                                        title={isSelf && isActive ? 'You cannot deactivate your own account' : undefined}
+                                    >
+                                        {isActive ? 'Deactivate' : 'Activate'}
+                                    </button>
+                                    <button type="button" className="rounded-lg px-2 py-1.5 text-xs font-medium hover:bg-ink/5" onClick={() => openAssign(row)}>
+                                        Change Role
+                                    </button>
+                                    <button type="button" className="rounded-lg px-2 py-1.5 text-xs font-medium hover:bg-ink/5" onClick={() => viewEffective(row)}>
+                                        Effective Permissions
+                                    </button>
+                                </div>
+                            );
+                        },
                     },
                 ]}
             />

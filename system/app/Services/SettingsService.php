@@ -41,8 +41,8 @@ class SettingsService
     }
 
     /**
-     * Daily order number that resets to 01 each calendar day.
-     * Format: ORD-20261105-01 (prefix-YYYYMMDD-sequence). Invoice numbers stay continuous.
+     * Daily order number that resets to 1 each calendar day.
+     * Format: ORD-1, ORD-2, … (invoice numbers stay continuous).
      * $id is unused but kept for call-site compatibility.
      */
     public function formatOrderNumber(int $id = 0): string
@@ -50,31 +50,35 @@ class SettingsService
         return $this->allocateDailyOrderNumber();
     }
 
-    /** Allocate the next order number for today (starts at 01 every day). Call inside a DB transaction. */
+    /** Allocate the next order number for today (starts at 1 every day). Call inside a DB transaction. */
     public function allocateDailyOrderNumber(): string
     {
         $prefix = $this->orderPrefix();
-        $dateKey = now()->format('Ymd');
-        $like = $prefix.'-'.$dateKey.'-%';
 
-        $latest = Order::query()
-            ->where('order_number', 'like', $like)
+        // Only count today's plain ORD-{n} numbers (ignore older dated formats).
+        $numbers = Order::query()
+            ->whereDate('ordered_at', now()->toDateString())
+            ->where('order_number', 'like', $prefix.'-%')
             ->lockForUpdate()
             ->orderByDesc('id')
-            ->value('order_number');
+            ->pluck('order_number');
 
         $sequence = 1;
-        if (is_string($latest) && preg_match('/-(\d+)$/', $latest, $matches) === 1) {
-            $sequence = ((int) $matches[1]) + 1;
+        $pattern = '/^'.preg_quote($prefix, '/').'-(\d+)$/';
+        foreach ($numbers as $number) {
+            if (is_string($number) && preg_match($pattern, $number, $matches) === 1) {
+                $sequence = ((int) $matches[1]) + 1;
+                break;
+            }
         }
 
-        return sprintf('%s-%s-%02d', $prefix, $dateKey, $sequence);
+        return sprintf('%s-%d', $prefix, $sequence);
     }
 
-    /** Continuous invoice number from sale id: INV-01, INV-12, INV-100. */
+    /** Continuous invoice number from sale id: INV-1, INV-12, INV-100. */
     public function formatInvoiceNumber(int $id): string
     {
-        return sprintf('%s-%02d', $this->invoicePrefix(), $id);
+        return sprintf('%s-%d', $this->invoicePrefix(), $id);
     }
 
     /** Kitchen tickets are only created when the kitchen is enabled and orders auto-send to it. */

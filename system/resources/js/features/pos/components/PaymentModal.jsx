@@ -101,6 +101,13 @@ export default function PaymentModal() {
                 <div className="afc-checkout-body">
                     <div className="afc-checkout-entry">
                         <div className="afc-checkout-payable"><HandPlatter size={66} strokeWidth={1.5} /><div><p>Payable Amount</p><strong>{money(due)}</strong></div></div>
+                        {discountCents > 0 && (
+                            <div className="afc-checkout-discount-summary" style={{ marginTop: 8, fontSize: 13, lineHeight: 1.5 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Total</span><span>{money(totals.subtotal)}</span></div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Discount</span><span>−{money(discountCents)}</span></div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}><span>Amount Paid</span><span>{money(due)}</span></div>
+                            </div>
+                        )}
                         {allowDiscounts && (
                             <div className="afc-checkout-discount-row">
                                 <button type="button" disabled={busy} className="afc-checkout-discount-btn" onClick={() => patch({ discountOpen: true })}>

@@ -185,12 +185,17 @@ class PosSaleService
                 $couponCode = $validated['coupon']->code;
             }
 
-            // Role cap covers line + manual + coupon discounts.
+            // Allow up to 100% of the order total; reject anything above.
             $cappedDiscountCents = $itemDiscountCents + $orderDiscountCents + $couponDiscountCents;
             $maximumDiscountPercent = (float) ($cashier->roles()->max('max_discount_percent') ?? 0);
-            if ($cappedDiscountCents > (int) round($subtotalCents * ($maximumDiscountPercent / 100))) {
+            if ($maximumDiscountPercent <= 0) {
+                $maximumDiscountPercent = 100;
+            }
+            $maximumDiscountPercent = min(100, $maximumDiscountPercent);
+            $allowedDiscountCents = (int) round($subtotalCents * ($maximumDiscountPercent / 100));
+            if ($cappedDiscountCents > $allowedDiscountCents) {
                 throw ValidationException::withMessages([
-                    $couponDiscountCents > 0 && $orderDiscountCents === 0 && $itemDiscountCents === 0 ? 'coupon_code' : 'discount_total' => ["Your maximum allowed discount is {$maximumDiscountPercent}%."],
+                    'discount_total' => ['Discount cannot be more than 100% of the total.'],
                 ]);
             }
 

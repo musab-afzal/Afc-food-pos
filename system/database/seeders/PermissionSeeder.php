@@ -176,13 +176,13 @@ class PermissionSeeder extends Seeder
             'manager' => [
                 'name' => 'Manager',
                 'description' => 'Restaurant operations: POS, orders, floor, customers, and key reports.',
-                'discount' => 25,
+                'discount' => 100,
                 'permissions' => $managerPermissions,
             ],
             'cashier' => [
                 'name' => 'Cashier',
                 'description' => 'POS sales, basic orders and customer creation.',
-                'discount' => 5,
+                'discount' => 100,
                 'permissions' => [
                     'dashboard.view', 'pos.access', 'pos.create_sale', 'pos.discount', 'pos.cancel_item',
                     'pos.hold_order', 'orders.view', 'orders.create', 'customers.view', 'customers.create',

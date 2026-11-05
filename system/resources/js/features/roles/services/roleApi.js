@@ -23,5 +23,9 @@ export const roleApi = {
         method: 'PUT',
         body: JSON.stringify(body),
     }),
+    setUserStatus: (userId, status) => api(`/admin/users/${userId}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status }),
+    }),
     effectivePermissions: (userId) => api(`/admin/users/${userId}/effective-permissions`),
 };

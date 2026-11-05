@@ -38,8 +38,8 @@ function fmtDateTime(value) {
     if (!value) return '';
     const date = new Date(value);
     const d = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-    const t = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-    return `${d} · ${t}`;
+    const t = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+    return `${d} - ${t}`;
 }
 
 function labelOrderType(type) {
@@ -69,14 +69,14 @@ export function normalizeReceiptData(raw = {}, extras = {}) {
     };
 
     const restaurant = raw.restaurant || {
-        name: settings.restaurant_name || 'AFC',
+        name: settings.restaurant_name || 'AALESHAN FOOD COURT',
         tagline: settings.restaurant_tagline || '',
         address: settings.restaurant_address || '',
         phone: settings.restaurant_phone || '',
         tax_number: settings.restaurant_tax_number || '',
         logo: settings.receipt_show_logo !== false && settings.restaurant_logo ? settings.restaurant_logo : null,
         header: settings.receipt_header || '',
-        footer: settings.receipt_footer || 'Thank you for dining with us.',
+        footer: settings.receipt_footer || 'Thank you for dining with us!',
     };
 
     const currency = raw.currency || {
@@ -174,8 +174,9 @@ function receiptStyles(size) {
     const width = contentWidth(size);
     const page = paperWidth(size);
     const base = narrow ? 11 : 12;
-    const brand = narrow ? 14 : 16;
-    const orderSize = narrow ? 18 : 22;
+    const brand = narrow ? 15 : 17;
+    const orderSize = narrow ? 20 : 26;
+    const copyLabel = narrow ? 11 : 12;
     const grand = narrow ? 13 : 15;
 
     return `
@@ -205,77 +206,76 @@ html, body {
   break-after: page;
 }
 .center { text-align: center; }
-.muted { color: #222; }
 .brand {
-  margin: 0; font-size: ${brand}px; font-weight: 700;
-  letter-spacing: 0.02em; text-transform: uppercase;
+  margin: 0; font-size: ${brand}px; font-weight: 800;
+  letter-spacing: 0.01em; text-transform: uppercase;
 }
-.tagline { margin: 2px 0 0; font-size: ${base - 1}px; }
-.contact { margin: 4px 0 0; font-size: ${base - 1}px; line-height: 1.4; }
-.logo {
-  display: block; margin: 0 auto 6px;
-  max-width: ${narrow ? '56px' : '84px'};
-  max-height: ${narrow ? '56px' : '84px'};
-  object-fit: contain;
-  filter: grayscale(100%);
-}
+.tagline { margin: 3px 0 0; font-size: ${base}px; font-weight: 500; }
+.contact { margin: 2px 0 0; font-size: ${base}px; line-height: 1.35; }
 .rule {
   border: 0; border-top: 1px dashed #000;
   margin: 8px 0;
 }
+.copy-title {
+  margin: 0;
+  text-align: center;
+  font-size: ${copyLabel}px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
 .order-no {
-  margin: 6px 0 2px;
+  margin: 4px 0 2px;
   font-size: ${orderSize}px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
+  font-weight: 900;
+  letter-spacing: 0.02em;
   text-align: center;
-  line-height: 1.15;
+  line-height: 1.1;
 }
-.invoice-no {
-  margin: 0 0 8px;
-  font-size: ${base}px;
-  font-weight: 600;
-  text-align: center;
-}
-.meta { margin: 0 0 2px; }
+.meta { margin: 0; }
 .meta-row {
   display: flex; justify-content: space-between; gap: 8px;
   margin: 2px 0;
 }
-.meta-label { color: #111; white-space: nowrap; }
+.meta-label { white-space: nowrap; }
 .meta-value { text-align: right; font-weight: 600; word-break: break-word; }
 .items { width: 100%; border-collapse: collapse; margin: 2px 0; }
 .items th {
-  font-size: ${base - 1}px; font-weight: 700;
+  font-size: ${base}px; font-weight: 700;
   text-align: left; padding: 0 0 4px;
-  border-bottom: 1px solid #000;
 }
-.items th.num, .items td.num { text-align: right; }
-.items th.qty, .items td.qty { width: ${narrow ? '18px' : '28px'}; text-align: center; }
-.items td { padding: 5px 0 2px; vertical-align: top; }
-.item-name { font-weight: 700; }
+.items th.num, .items td.num { text-align: right; white-space: nowrap; }
+.items th.qty, .items td.qty { width: ${narrow ? '22px' : '28px'}; text-align: left; }
+.items th.price, .items td.price { width: ${narrow ? '48px' : '58px'}; }
+.items th.total, .items td.total { width: ${narrow ? '52px' : '64px'}; }
+.items td { padding: 4px 0 2px; vertical-align: top; }
+.item-name { font-weight: 600; }
 .item-sub {
   display: block; font-size: ${base - 1}px; font-weight: 400;
-  padding-left: ${narrow ? '0' : '2px'}; margin-top: 1px;
+  margin-top: 1px;
 }
 .item-note { display: block; font-size: ${base - 1}px; font-style: italic; margin-top: 1px; }
 .totals { margin-top: 2px; }
 .total-row {
   display: flex; justify-content: space-between; gap: 8px;
-  margin: 2px 0;
+  margin: 3px 0;
 }
 .total-row.grand {
-  font-size: ${grand}px; font-weight: 700;
-  margin-top: 4px; padding-top: 4px;
-  border-top: 1px solid #000;
+  font-size: ${grand}px; font-weight: 800;
 }
 .pay-block { margin-top: 2px; }
 .footer {
-  margin-top: 10px; text-align: center;
-  font-size: ${base - 1}px; white-space: pre-line;
+  margin-top: 2px; text-align: center;
+  font-size: ${base}px;
 }
-.powered { margin-top: 6px; font-size: ${base - 2}px; color: #333; }
-.powered strong { font-weight: 700; color: #000; }
+.powered {
+  margin-top: 6px; text-align: center;
+  font-size: ${base}px; font-weight: 700;
+}
+.powered small {
+  display: block; margin-top: 2px;
+  font-size: ${base - 1}px; font-weight: 600;
+}
 .qr-wrap { margin-top: 8px; text-align: center; }
 .qr-wrap img { width: ${narrow ? '88px' : '110px'}; height: ${narrow ? '88px' : '110px'}; }
 .qr-caption { margin-top: 4px; font-size: ${base - 1}px; }
@@ -287,85 +287,62 @@ html, body {
 `.trim();
 }
 
-function guestNamePhone(data) {
-    const name = data.delivery_name || data.customer?.name || '';
-    const phone = data.delivery_phone || data.customer?.phone || '';
-    return { name, phone };
+function formatPlainAmount(value) {
+    const amount = Number(value || 0);
+    const whole = Number.isInteger(amount) || Math.abs(amount - Math.round(amount)) < 0.001;
+    return amount.toLocaleString('en-PK', {
+        minimumFractionDigits: whole ? 0 : 2,
+        maximumFractionDigits: 2,
+    });
 }
 
-function renderItems(data, narrow) {
-    const money = (v) => formatReceiptMoney(v, data.currency);
-    if (narrow) {
-        return data.items.map((item) => {
-            const lines = [];
-            lines.push(`<div class="item-name">${item.quantity} × ${escapeHtml(item.dish_name)}${item.variant_name ? ` (${escapeHtml(item.variant_name)})` : ''}</div>`);
-            (item.addons || []).forEach((addon) => {
-                lines.push(`<span class="item-sub">+ ${escapeHtml(addon.name)}${Number(addon.price) ? `  ${money(addon.price)}` : ''}</span>`);
-            });
-            (item.removed_ingredients || []).forEach((row) => {
-                const label = row.name || row;
-                lines.push(`<span class="item-note">No ${escapeHtml(label)}</span>`);
-            });
-            if (item.notes) lines.push(`<span class="item-note">Note: ${escapeHtml(item.notes)}</span>`);
-            return `<tr>
-              <td colspan="2">${lines.join('')}</td>
-              <td class="num">${money(item.total)}</td>
-            </tr>`;
-        }).join('');
-    }
-
+function renderItems(data) {
     return data.items.map((item) => {
         const details = [];
         (item.addons || []).forEach((addon) => {
-            details.push(`<span class="item-sub">+ ${escapeHtml(addon.name)}${Number(addon.price) ? `  ${money(addon.price)}` : ''}</span>`);
+            details.push(`<span class="item-sub">+ ${escapeHtml(addon.name)}</span>`);
         });
         (item.removed_ingredients || []).forEach((row) => {
             const label = row.name || row;
             details.push(`<span class="item-note">No ${escapeHtml(label)}</span>`);
         });
-        if (item.notes) details.push(`<span class="item-note">Note: ${escapeHtml(item.notes)}</span>`);
+        if (item.notes) details.push(`<span class="item-note">${escapeHtml(item.notes)}</span>`);
+        const name = `${escapeHtml(item.dish_name)}${item.variant_name ? ` (${escapeHtml(item.variant_name)})` : ''}`;
         return `<tr>
           <td class="qty">${escapeHtml(item.quantity)}</td>
-          <td><div class="item-name">${escapeHtml(item.dish_name)}${item.variant_name ? ` (${escapeHtml(item.variant_name)})` : ''}</div>${details.join('')}</td>
-          <td class="num">${money(item.unit_price)}</td>
-          <td class="num">${money(item.total)}</td>
+          <td><div class="item-name">${name}</div>${details.join('')}</td>
+          <td class="num price">${formatPlainAmount(item.unit_price)}</td>
+          <td class="num total">${formatPlainAmount(item.total)}</td>
         </tr>`;
     }).join('');
 }
 
-function renderPaymentsHtml(data) {
-    const money = (v) => formatReceiptMoney(v, data.currency);
-    const payments = (data.payments || []).filter((p) => Number(p.amount || 0) > 0);
-    if (!payments.length) return '';
-
-    if (payments.length === 1) {
-        const payment = payments[0];
-        const method = payment.method?.name || payment.method_name || payment.payment_method?.name || 'Payment';
-        const reference = payment.reference || payment.transaction_reference;
-        return `
-          <div class="rule"></div>
-          <div class="pay-block">
-            ${metaRow('Payment Method', method)}
-            ${reference ? metaRow('Reference', reference) : ''}
-            ${metaRow('Amount Paid', money(data.totals.paid_total ?? payment.amount))}
-            ${Number(data.totals.change_total) > 0 ? metaRow('Change', money(data.totals.change_total)) : ''}
-          </div>`;
-    }
-
-    const rows = payments.map((payment) => {
-        const method = payment.method?.name || payment.method_name || payment.payment_method?.name || 'Payment';
-        const reference = payment.reference ? ` (${escapeHtml(payment.reference)})` : '';
-        return `<div class="total-row"><span>${escapeHtml(method)}${reference}</span><span>${money(payment.amount)}</span></div>`;
-    }).join('');
-
+function itemsTable(data) {
     return `
-      <div class="rule"></div>
-      <div class="pay-block">
-        <div class="item-name" style="margin-bottom:3px">Payments</div>
-        ${rows}
-        <div class="total-row" style="font-weight:700;margin-top:4px"><span>Paid</span><span>${money(data.totals.paid_total)}</span></div>
-        ${Number(data.totals.change_total) > 0 ? `<div class="total-row"><span>Change</span><span>${money(data.totals.change_total)}</span></div>` : ''}
-      </div>`;
+  <table class="items">
+    <thead>
+      <tr>
+        <th class="qty">Qty</th>
+        <th>Item</th>
+        <th class="num price">Price</th>
+        <th class="num total">Total</th>
+      </tr>
+    </thead>
+    <tbody>${renderItems(data)}</tbody>
+  </table>`;
+}
+
+function paymentMethodLabel(data) {
+    const payments = (data.payments || []).filter((p) => Number(p.amount || 0) > 0);
+    if (!payments.length) {
+        const status = String(data.payment_status || '').toLowerCase();
+        if (['unpaid', 'pending'].includes(status)) return status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+        return '';
+    }
+    if (payments.length === 1) {
+        return payments[0].method?.name || payments[0].method_name || payments[0].payment_method?.name || 'Cash';
+    }
+    return payments.map((p) => p.method?.name || p.method_name || p.payment_method?.name || 'Payment').join(' + ');
 }
 
 function reviewQrHtml(data) {
@@ -381,103 +358,93 @@ function reviewQrHtml(data) {
       </div>`;
 }
 
-function brandHeader(data) {
-    const r = data.restaurant || {};
-    const logoHtml = r.logo
-        ? `<img class="logo" src="${escapeHtml(r.logo)}" alt="" onerror="this.style.display='none'" />`
-        : '';
-    // Email intentionally omitted from printed slips.
-    const contactBits = [r.phone, r.address, r.tax_number ? `NTN: ${r.tax_number}` : '']
-        .filter(Boolean)
-        .map((line) => escapeHtml(line).replace(/\n/g, '<br>'));
-    const headerExtra = r.header
-        ? `<div class="contact muted">${escapeHtml(r.header).replace(/\n/g, '<br>')}</div>`
-        : '';
+function poweredFooter(data) {
+    const footer = (data.restaurant || {}).footer || 'Thank you for dining with us!';
     return `
-  <div class="center">
-    ${logoHtml}
-    <h1 class="brand">${escapeHtml(r.name || 'AFC')}</h1>
-    ${r.tagline ? `<p class="tagline muted">${escapeHtml(r.tagline)}</p>` : ''}
-    ${contactBits.length ? `<div class="contact muted">${contactBits.join('<br>')}</div>` : ''}
-    ${headerExtra}
-  </div>`;
+  <div class="footer">${escapeHtml(footer)}</div>
+  <div class="powered">Powered by Musab Afzal<small>03258090011</small></div>`;
 }
 
-/** One full slip — printed twice so the printer can cut into identical kitchen + guest halves. */
-function slipHtml(data, { pageBreakAfter = false } = {}) {
-    const narrow = isNarrow(data.options.paper_size || '80mm');
+/** Customer invoice — matches provided design. */
+function customerInvoiceHtml(data, { pageBreakAfter = false } = {}) {
     const money = (v) => formatReceiptMoney(v, data.currency);
-    const guest = guestNamePhone(data);
-    const showTable = data.order_type === 'dine_in' && (data.table?.name || data.table?.table_number);
-    const tableLabel = data.table?.name || (data.table?.table_number ? `Table ${data.table.table_number}` : '');
-    const processingValue = data.processing_minutes === null || data.processing_minutes === '' ? NaN : Number(data.processing_minutes);
-    const discount = Number(data.totals.discount_total || 0);
-    const tax = Number(data.totals.tax_total || 0);
-    const service = Number(data.totals.service_charge || 0);
-    const delivery = Number(data.totals.delivery_charge || 0);
-    const showTax = data.options.show_tax !== false && tax > 0;
+    const r = data.restaurant || {};
+    const total = Number(data.totals.subtotal ?? 0);
+    const discount = Number(data.totals.discount_total ?? 0);
+    const afterDiscount = Math.max(0, total - discount);
     const paid = Number(data.totals.paid_total || 0);
-    const grand = Number(data.totals.grand_total || 0);
-    const balance = Math.max(0, grand - paid);
-    const status = String(data.payment_status || '').toLowerCase();
-    const showBalance = balance > 0.009 || ['partial', 'partially_paid', 'unpaid', 'pending'].includes(status);
-    const itemHeader = narrow
-        ? `<tr><th colspan="2">Item</th><th class="num">Total</th></tr>`
-        : `<tr><th class="qty">Qty</th><th>Item</th><th class="num">Price</th><th class="num">Total</th></tr>`;
+    const grand = Number(data.totals.grand_total || afterDiscount);
+    const method = paymentMethodLabel(data);
 
     return `
 <section class="slip${pageBreakAfter ? ' slip-cut' : ''}">
-  ${brandHeader(data)}
+  <div class="center">
+    <h1 class="brand">${escapeHtml(r.name || 'AALESHAN FOOD COURT')}</h1>
+    ${r.tagline ? `<p class="tagline">${escapeHtml(r.tagline)}</p>` : ''}
+    ${r.phone ? `<div class="contact">${escapeHtml(r.phone)}</div>` : ''}
+    ${r.address ? `<div class="contact">${escapeHtml(r.address).replace(/\n/g, '<br>')}</div>` : ''}
+  </div>
   <div class="rule"></div>
+  <div class="copy-title">Customer Invoice</div>
   <div class="order-no">${escapeHtml(data.order_number || '—')}</div>
-  <div class="invoice-no">Invoice: ${escapeHtml(data.invoice_number || '—')}</div>
+  <div class="rule"></div>
   <div class="meta">
+    ${metaRow('Invoice No', data.invoice_number)}
     ${metaRow('Date & Time', fmtDateTime(data.sold_at))}
     ${data.cashier?.name ? metaRow('Cashier', data.cashier.name) : ''}
     ${metaRow('Order Type', labelOrderType(data.order_type))}
-    ${showTable ? metaRow('Table', tableLabel) : ''}
-    ${guest.name ? metaRow('Name', guest.name) : ''}
-    ${guest.phone ? metaRow('Number', guest.phone) : ''}
-    ${data.customer?.address && !guest.name ? metaRow('Customer', data.customer.name) : ''}
-    ${Number.isFinite(processingValue) && processingValue > 0 ? metaRow('Processing', `${processingValue} min`) : ''}
   </div>
   <div class="rule"></div>
-  <table class="items">
-    <thead>${itemHeader}</thead>
-    <tbody>${renderItems(data, narrow)}</tbody>
-  </table>
+  ${itemsTable(data)}
   <div class="rule"></div>
   <div class="totals">
-    <div class="total-row"><span>Subtotal</span><span>${money(data.totals.subtotal)}</span></div>
-    ${discount > 0 ? `<div class="total-row"><span>Discount</span><span>-${money(discount)}</span></div>` : ''}
-    ${showTax ? `<div class="total-row"><span>Tax</span><span>${money(tax)}</span></div>` : ''}
-    ${service > 0 ? `<div class="total-row"><span>Service Charge</span><span>${money(service)}</span></div>` : ''}
-    ${delivery > 0 ? `<div class="total-row"><span>Delivery Charge</span><span>${money(delivery)}</span></div>` : ''}
-    <div class="total-row grand"><span>GRAND TOTAL</span><span>${money(grand)}</span></div>
+    <div class="total-row"><span>TOTAL</span><span>${money(total)}</span></div>
+    ${discount > 0 ? `<div class="total-row"><span>Discount</span><span>- ${money(discount)}</span></div>` : ''}
+    <div class="total-row grand"><span>Amount Paid</span><span>${money(discount > 0 ? afterDiscount : (paid > 0 ? paid : grand))}</span></div>
   </div>
-  ${renderPaymentsHtml(data)}
-  ${showBalance ? `
-    <div class="rule"></div>
-    <div class="pay-block">
-      ${metaRow('Paid', money(paid))}
-      ${metaRow('Balance Due', money(balance))}
-      ${status ? metaRow('Payment Status', status.replace(/_/g, ' ').toUpperCase()) : ''}
-    </div>` : ''}
-  ${data.custom_slip_message ? `<div class="rule"></div><div class="center" style="font-weight:700;white-space:pre-line">${escapeHtml(data.custom_slip_message)}</div>` : ''}
+  <div class="meta" style="margin-top:4px">
+    ${method ? metaRow('Payment Method', method) : ''}
+  </div>
+  ${data.custom_slip_message ? `<div class="rule"></div><div class="center" style="font-weight:700">${escapeHtml(data.custom_slip_message)}</div>` : ''}
   ${reviewQrHtml(data)}
   <div class="rule"></div>
-  <div class="footer">${escapeHtml((data.restaurant || {}).footer || 'Thank you for dining with us!').replace(/\n/g, '<br>')}</div>
-  <div class="powered center"><strong>Powered by Musab Afzal</strong><br>03258090011</div>
+  ${poweredFooter(data)}
+</section>`;
+}
+
+/** Kitchen ticket — matches provided “For Kitchen” design. */
+function kitchenTicketHtml(data, { pageBreakAfter = false } = {}) {
+    const money = (v) => formatReceiptMoney(v, data.currency);
+    const subtotal = Number(data.totals.subtotal ?? data.totals.grand_total ?? 0);
+
+    return `
+<section class="slip${pageBreakAfter ? ' slip-cut' : ''}">
+  <div class="copy-title">For Kitchen</div>
+  <div class="order-no">${escapeHtml(data.order_number || '—')}</div>
+  <div class="rule"></div>
+  <div class="meta">
+    ${metaRow('Invoice No', data.invoice_number)}
+    ${metaRow('Date & Time', fmtDateTime(data.sold_at))}
+    ${metaRow('Order Type', labelOrderType(data.order_type))}
+  </div>
+  <div class="rule"></div>
+  ${itemsTable(data)}
+  <div class="rule"></div>
+  <div class="totals">
+    <div class="total-row grand"><span>Subtotal</span><span>${money(subtotal)}</span></div>
+  </div>
+  <div class="rule"></div>
+  ${poweredFooter(data)}
 </section>`;
 }
 
 /**
- * Build a full printable HTML document: two identical slips with a page break for the cutter.
+ * Print kitchen ticket first, then customer invoice (page break for cutter).
  */
 export function buildReceiptHtml(raw, extras = {}) {
     const data = normalizeReceiptData(raw, extras);
     const size = data.options.paper_size || '80mm';
-    const body = `${slipHtml(data, { pageBreakAfter: true })}${slipHtml(data)}`;
+    const body = `${kitchenTicketHtml(data, { pageBreakAfter: true })}${customerInvoiceHtml(data)}`;
 
     return `<!doctype html>
 <html>

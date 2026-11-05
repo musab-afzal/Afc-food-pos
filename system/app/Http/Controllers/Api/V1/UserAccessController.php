@@ -114,6 +114,71 @@ class UserAccessController extends Controller
         ]);
     }
 
+    public function setStatus(Request $request, User $user, ActivityLogger $activityLogger): JsonResponse
+    {
+        $data = $request->validate([
+            'status' => ['required', 'string', 'in:active,inactive'],
+        ]);
+
+        $status = $data['status'];
+        $isActive = $status === 'active';
+
+        if (! $isActive) {
+            if ($request->user()?->id === $user->id) {
+                return $this->error('You cannot deactivate your own account.', 422, [
+                    'status' => ['You cannot deactivate your own account.'],
+                ]);
+            }
+
+            try {
+                $this->roles->assertNotLastSuperAdmin($user);
+            } catch (ValidationException $e) {
+                return $this->error(
+                    collect($e->errors())->flatten()->first() ?: 'Cannot deactivate the final Super Admin.',
+                    422,
+                    $e->errors(),
+                );
+            }
+        }
+
+        $before = [
+            'status' => $user->status,
+            'is_active' => $user->is_active,
+        ];
+
+        $user->update([
+            'status' => $status,
+            'is_active' => $isActive,
+        ]);
+
+        if ($user->staff) {
+            $user->staff->update([
+                'status' => $isActive ? 'active' : 'inactive',
+            ]);
+        }
+
+        if (! $isActive) {
+            $user->tokens()->delete();
+        }
+
+        $activityLogger->log(
+            $request,
+            $isActive ? 'user.activated' : 'user.deactivated',
+            'users',
+            $user,
+            $before,
+            ['status' => $user->status, 'is_active' => $user->is_active],
+        );
+
+        return $this->success($isActive ? 'User account activated.' : 'User account deactivated.', [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'status' => $user->status,
+            'is_active' => $user->is_active,
+        ]);
+    }
+
     public function effectivePermissions(User $user): JsonResponse
     {
         $roles = $user->roles()->where('roles.is_active', true)->with('permissions:id,name,slug,module')->get();

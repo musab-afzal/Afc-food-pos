@@ -79,7 +79,7 @@ Route::prefix('v1')->group(function (): void {
             ->middleware('throttle:10,1');
     });
 
-    Route::middleware('auth:sanctum')->group(function (): void {
+    Route::middleware(['auth:sanctum', 'account_active'])->group(function (): void {
         Route::get('me', [AuthController::class, 'me']);
         Route::post('logout', [AuthController::class, 'logout']);
         Route::put('password', [AuthController::class, 'changePassword']);
@@ -212,6 +212,7 @@ Route::prefix('v1')->group(function (): void {
 
             Route::get('user-access', [UserAccessController::class, 'index']);
             Route::put('users/{user}/role', [UserAccessController::class, 'assignRole'])->whereNumber('user');
+            Route::put('users/{user}/status', [UserAccessController::class, 'setStatus'])->whereNumber('user');
             Route::get('users/{user}/effective-permissions', [UserAccessController::class, 'effectivePermissions'])->whereNumber('user');
 
             // Danger Zone: bulk delete + print lists (Super Admin only).
