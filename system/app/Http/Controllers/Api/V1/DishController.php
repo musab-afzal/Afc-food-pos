@@ -11,6 +11,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class DishController extends Controller
 {
@@ -90,5 +92,26 @@ class DishController extends Controller
         });
 
         return response()->json(['success' => true, 'message' => 'Dish archived. Historical sales were preserved.']);
+    }
+
+    /** Upload a dish image to public storage; returns path + URL for the form. */
+    public function uploadImage(Request $request): JsonResponse
+    {
+        $request->validate([
+            'image' => ['required', 'image', 'mimes:jpeg,jpg,png,webp,gif', 'max:5120'],
+        ]);
+
+        $file = $request->file('image');
+        $name = Str::uuid()->toString().'.'.$file->getClientOriginalExtension();
+        $path = $file->storeAs('dishes', $name, 'public');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Image uploaded.',
+            'data' => [
+                'path' => $path,
+                'url' => Storage::disk('public')->url($path),
+            ],
+        ]);
     }
 }

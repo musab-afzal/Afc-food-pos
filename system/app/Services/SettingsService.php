@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Models\Order;
 use App\Models\Setting;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
 class SettingsService
@@ -38,13 +40,38 @@ class SettingsService
         return $prefix !== '' ? $prefix : 'INV';
     }
 
-    /** `{prefix}-{id}` with at least two digits, e.g. ORD-01, ORD-12, ORD-100. */
-    public function formatOrderNumber(int $id): string
+    /**
+     * Daily order number that resets to 01 each calendar day.
+     * Format: ORD-20261105-01 (prefix-YYYYMMDD-sequence). Invoice numbers stay continuous.
+     * $id is unused but kept for call-site compatibility.
+     */
+    public function formatOrderNumber(int $id = 0): string
     {
-        return sprintf('%s-%02d', $this->orderPrefix(), $id);
+        return $this->allocateDailyOrderNumber();
     }
 
-    /** `{invoicePrefix}-{id}` with at least two digits, e.g. INV-01. */
+    /** Allocate the next order number for today (starts at 01 every day). Call inside a DB transaction. */
+    public function allocateDailyOrderNumber(): string
+    {
+        $prefix = $this->orderPrefix();
+        $dateKey = now()->format('Ymd');
+        $like = $prefix.'-'.$dateKey.'-%';
+
+        $latest = Order::query()
+            ->where('order_number', 'like', $like)
+            ->lockForUpdate()
+            ->orderByDesc('id')
+            ->value('order_number');
+
+        $sequence = 1;
+        if (is_string($latest) && preg_match('/-(\d+)$/', $latest, $matches) === 1) {
+            $sequence = ((int) $matches[1]) + 1;
+        }
+
+        return sprintf('%s-%s-%02d', $prefix, $dateKey, $sequence);
+    }
+
+    /** Continuous invoice number from sale id: INV-01, INV-12, INV-100. */
     public function formatInvoiceNumber(int $id): string
     {
         return sprintf('%s-%02d', $this->invoicePrefix(), $id);
@@ -99,9 +126,9 @@ class SettingsService
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, array{key: string, value: mixed, type: string, group: string}>
+     * @return Collection<int, array{key: string, value: mixed, type: string, group: string}>
      */
-    public function all(): \Illuminate\Support\Collection
+    public function all(): Collection
     {
         /** @var list<array{key: string, value: mixed, type: string, group: string}> $rows */
         $rows = Cache::remember(self::CACHE_KEY, self::CACHE_TTL, function (): array {

@@ -298,6 +298,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('deals/products', [DealController::class, 'products']);
             Route::get('deals/{deal}', [DealController::class, 'show']);
         });
+        Route::post('dishes/upload-image', [DishController::class, 'uploadImage'])
+            ->middleware('permission:menu.create,menu.edit');
         Route::middleware('permission:menu.create')->group(function (): void {
             Route::post('categories', [CategoryController::class, 'store']);
             Route::post('dishes', [DishController::class, 'store']);

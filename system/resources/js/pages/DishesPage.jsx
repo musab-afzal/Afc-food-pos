@@ -1,4 +1,4 @@
-import { Archive, Edit3, Plus, Trash2, UtensilsCrossed } from 'lucide-react';
+import { Archive, Edit3, ImagePlus, Plus, Trash2, UtensilsCrossed, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import DataTable from '../components/DataTable.jsx';
@@ -10,6 +10,10 @@ import StatusBadge from '../components/StatusBadge.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { usePaginatedResource } from '../hooks/usePaginatedResource.js';
 import { api } from '../services/api.js';
+
+function dishImageSrc(dish) {
+    return dish?.image_url || dish?.image || '';
+}
 
 const defaults = { category_id: '', brand_id: null, name: '', slug: '', sku: '', barcode: '', description: '', short_description: '', image: '', base_price: '', tax_percent: 0, preparation_minutes: 10, is_active: true, is_available: true, dine_in_enabled: true, takeaway_enabled: true, delivery_enabled: true, qr_enabled: true, pos_enabled: true, kitchen_enabled: true, sort_order: 0, variants: [] };
 const emptyVariant = { id: null, name: '', sku: '', price: '' };
@@ -30,11 +34,14 @@ export default function DishesPage() {
     const [notice, setNotice] = useState('');
     const [removedVariantIds, setRemovedVariantIds] = useState([]);
     const [variantsLoading, setVariantsLoading] = useState(false);
+    const [imagePreview, setImagePreview] = useState('');
+    const [uploadingImage, setUploadingImage] = useState(false);
 
     useEffect(() => { api('/categories?per_page=100&is_active=1').then((response) => setCategories(response.data)); }, []);
     function openForm(dish = null) {
         setEditing(dish); setRemovedVariantIds([]);
         setForm(dish ? { ...defaults, ...dish, category_id: dish.category_id, brand_id: dish.brand_id || null, description: dish.description || '', short_description: dish.short_description || '', image: dish.image || '', barcode: dish.barcode || '', variants: [] } : defaults);
+        setImagePreview(dishImageSrc(dish));
         setFormErrors({}); setIsFormOpen(true);
         if (dish) {
             setVariantsLoading(true);
@@ -80,6 +87,29 @@ export default function DishesPage() {
         }
         return failures;
     }
+    async function uploadImage(file) {
+        if (!file) return;
+        setUploadingImage(true); setFormErrors((current) => ({ ...current, image: undefined }));
+        try {
+            const body = new FormData();
+            body.append('image', file);
+            const response = await api('/dishes/upload-image', { method: 'POST', body });
+            const path = response.data?.path || '';
+            const url = response.data?.url || '';
+            setForm((current) => ({ ...current, image: path }));
+            setImagePreview(url || path);
+        } catch (caught) {
+            setFormErrors((current) => ({ ...current, image: [caught.message] }));
+        } finally {
+            setUploadingImage(false);
+        }
+    }
+
+    function clearImage() {
+        setForm((current) => ({ ...current, image: '' }));
+        setImagePreview('');
+    }
+
     async function submit(event) {
         event.preventDefault(); setBusy(true); setFormErrors({});
         try {
@@ -88,7 +118,7 @@ export default function DishesPage() {
             const dishId = response.data?.id ?? editing?.id;
             const failures = dishId && (form.variants.length || removedVariantIds.length) ? await syncVariants(dishId, form.sku) : [];
             setNotice(failures.length ? `${response.message} Some variations were not saved — ${failures.join('; ')}` : response.message);
-            setIsFormOpen(false); setEditing(null); setRemovedVariantIds([]); await reload();
+            setIsFormOpen(false); setEditing(null); setRemovedVariantIds([]); setImagePreview(''); await reload();
         } catch (caught) { setFormErrors(caught.errors || { general: [caught.message] }); }
         finally { setBusy(false); }
     }
@@ -99,7 +129,23 @@ export default function DishesPage() {
         finally { setBusy(false); }
     }
     const columns = [
-        { key: 'name', label: 'Dish', render: (row) => <div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-xl bg-[#edf2e8] text-herb"><UtensilsCrossed size={18} /></span><div><p className="font-semibold">{row.name}</p><p className="text-xs text-ink/40">{row.sku}</p></div></div> },
+        {
+            key: 'name',
+            label: 'Dish',
+            render: (row) => {
+                const src = dishImageSrc(row);
+                return (
+                    <div className="flex items-center gap-3">
+                        {src ? (
+                            <img src={src} alt="" className="size-10 rounded-xl object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} />
+                        ) : (
+                            <span className="grid size-10 place-items-center rounded-xl bg-[#edf2e8] text-herb"><UtensilsCrossed size={18} /></span>
+                        )}
+                        <div><p className="font-semibold">{row.name}</p><p className="text-xs text-ink/40">{row.sku}</p></div>
+                    </div>
+                );
+            },
+        },
         { key: 'category', label: 'Category', render: (row) => row.category?.name || '—' },
         { key: 'base_price', label: 'Price', render: (row) => <span className="font-semibold">{currency(row.base_price)}</span> },
         { key: 'availability', label: 'Availability', render: (row) => <StatusBadge active={row.is_available} activeLabel="Available" inactiveLabel="Unavailable" /> },
@@ -159,8 +205,44 @@ export default function DishesPage() {
             </ListFilters>
             <DataTable columns={columns} rows={rows} loading={loading} emptyMessage="No dishes match these filters." />
             <Pagination meta={meta} onPage={(page) => setFilters({ ...filters, page })} />
-            <FormModal open={isFormOpen} title={editing ? 'Edit dish' : 'Add dish'} description="Configure selling channels, availability and pricing." onClose={() => setIsFormOpen(false)} onSubmit={submit} busy={busy} submitLabel={editing ? 'Update dish' : 'Create dish'} wide>
+            <FormModal open={isFormOpen} title={editing ? 'Edit dish' : 'Add dish'} description="Configure selling channels, availability and pricing." onClose={() => { setIsFormOpen(false); setImagePreview(''); }} onSubmit={submit} busy={busy || uploadingImage} submitLabel={editing ? 'Update dish' : 'Create dish'} wide>
                 <div className="grid gap-5">
+                    <div className="rounded-[5px] border border-dashed border-ink/15 bg-light p-4">
+                        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted">Dish image</p>
+                        <div className="flex flex-wrap items-center gap-4">
+                            <div className="grid size-24 place-items-center overflow-hidden rounded-2xl bg-white text-herb shadow-sm">
+                                {imagePreview ? (
+                                    <img src={imagePreview} alt="" className="size-full object-cover" />
+                                ) : (
+                                    <UtensilsCrossed size={28} />
+                                )}
+                            </div>
+                            <div className="min-w-0 flex-1 space-y-2">
+                                <label className="btn-primary inline-flex cursor-pointer items-center gap-2">
+                                    <ImagePlus size={16} />
+                                    {uploadingImage ? 'Uploading…' : (imagePreview ? 'Change image' : 'Upload image')}
+                                    <input
+                                        type="file"
+                                        accept="image/jpeg,image/png,image/webp,image/gif"
+                                        className="hidden"
+                                        disabled={uploadingImage || busy}
+                                        onChange={(event) => {
+                                            const file = event.target.files?.[0];
+                                            event.target.value = '';
+                                            uploadImage(file);
+                                        }}
+                                    />
+                                </label>
+                                {imagePreview && (
+                                    <button type="button" onClick={clearImage} className="ml-2 inline-flex items-center gap-1 rounded-[5px] px-2.5 py-1.5 text-xs font-bold text-coral hover:bg-coral/5">
+                                        <X size={14} /> Remove
+                                    </button>
+                                )}
+                                <p className="text-xs text-muted">JPG, PNG, WEBP or GIF · max 5 MB. Shown on POS and menus.</p>
+                                {formErrors.image && <span className="block text-xs text-coral">{formErrors.image[0]}</span>}
+                            </div>
+                        </div>
+                    </div>
                     <div className="grid gap-4 sm:grid-cols-2">
                         <Field label="Dish name" error={formErrors.name} value={form.name} onChange={(value) => setForm({ ...form, name: value, slug: editing ? form.slug : slugify(value) })} />
                         <Field label="Slug" error={formErrors.slug} value={form.slug} onChange={(value) => setForm({ ...form, slug: slugify(value) })} />

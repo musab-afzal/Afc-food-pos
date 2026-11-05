@@ -34,7 +34,7 @@ class UpsertDishRequest extends FormRequest
             'barcode' => ['nullable', 'string', 'max:100', Rule::unique('dishes')->ignore($this->route('dish'))],
             'description' => ['nullable', 'string', 'max:5000'],
             'short_description' => ['nullable', 'string', 'max:500'],
-            'image' => ['nullable', 'string', 'max:500'],
+            'image' => ['nullable', 'string', 'max:1000'],
             'base_price' => ['required', 'numeric', 'min:0', 'max:999999999999.99'],
             'tax_percent' => ['required', 'numeric', 'min:0', 'max:100'],
             'preparation_minutes' => ['required', 'integer', 'min:0', 'max:1440'],

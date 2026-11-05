@@ -3,14 +3,18 @@ const apiBase = `${appBase}/api/v1`;
 
 export async function api(path, options = {}) {
     const token = localStorage.getItem('respos_token');
+    const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
+    const headers = {
+        Accept: 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options.headers,
+    };
+    if (!isFormData && !headers['Content-Type']) {
+        headers['Content-Type'] = 'application/json';
+    }
     const response = await fetch(`${apiBase}${path}`, {
         ...options,
-        headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            ...options.headers,
-        },
+        headers,
     });
     const body = await response.json().catch(() => ({ success: false, message: 'The server returned an invalid response.' }));
     if (!response.ok) {
