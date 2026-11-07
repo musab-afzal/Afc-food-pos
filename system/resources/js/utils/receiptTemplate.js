@@ -296,7 +296,7 @@ function formatPlainAmount(value) {
     });
 }
 
-function renderItems(data, { showPrices = true } = {}) {
+function renderItems(data, { mode = 'full' } = {}) {
     return data.items.map((item) => {
         const details = [];
         (item.addons || []).forEach((addon) => {
@@ -308,10 +308,11 @@ function renderItems(data, { showPrices = true } = {}) {
         });
         if (item.notes) details.push(`<span class="item-note">${escapeHtml(item.notes)}</span>`);
         const name = `${escapeHtml(item.dish_name)}${item.variant_name ? ` (${escapeHtml(item.variant_name)})` : ''}`;
-        if (!showPrices) {
+        if (mode === 'kitchen') {
             return `<tr>
           <td class="qty">${escapeHtml(item.quantity)}</td>
           <td><div class="item-name">${name}</div>${details.join('')}</td>
+          <td class="num price">${formatPlainAmount(item.unit_price)}</td>
         </tr>`;
         }
         return `<tr>
@@ -323,17 +324,18 @@ function renderItems(data, { showPrices = true } = {}) {
     }).join('');
 }
 
-function itemsTable(data, { showPrices = true } = {}) {
-    if (!showPrices) {
+function itemsTable(data, { mode = 'full' } = {}) {
+    if (mode === 'kitchen') {
         return `
   <table class="items">
     <thead>
       <tr>
         <th class="qty">Qty</th>
         <th>Item</th>
+        <th class="num price">Price</th>
       </tr>
     </thead>
-    <tbody>${renderItems(data, { showPrices: false })}</tbody>
+    <tbody>${renderItems(data, { mode: 'kitchen' })}</tbody>
   </table>`;
     }
     return `
@@ -346,7 +348,7 @@ function itemsTable(data, { showPrices = true } = {}) {
         <th class="num total">Total</th>
       </tr>
     </thead>
-    <tbody>${renderItems(data, { showPrices: true })}</tbody>
+    <tbody>${renderItems(data, { mode: 'full' })}</tbody>
   </table>`;
 }
 
@@ -430,7 +432,7 @@ function customerInvoiceHtml(data, { pageBreakAfter = false } = {}) {
 </section>`;
 }
 
-/** Kitchen ticket — qty + item only (no prices, totals, or marketing footer). */
+/** Kitchen ticket — qty, item, and unit price (no totals or marketing footer). */
 function kitchenTicketHtml(data, { pageBreakAfter = false } = {}) {
     return `
 <section class="slip${pageBreakAfter ? ' slip-cut' : ''}">
@@ -443,7 +445,7 @@ function kitchenTicketHtml(data, { pageBreakAfter = false } = {}) {
     ${metaRow('Order Type', labelOrderType(data.order_type))}
   </div>
   <div class="rule"></div>
-  ${itemsTable(data, { showPrices: false })}
+  ${itemsTable(data, { mode: 'kitchen' })}
   <div class="rule"></div>
 </section>`;
 }
