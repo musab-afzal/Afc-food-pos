@@ -425,15 +425,15 @@ function customerInvoiceHtml(data, { pageBreakAfter = false } = {}) {
   <div class="meta" style="margin-top:4px">
     ${method ? metaRow('Payment Method', method) : ''}
   </div>
-  ${data.custom_slip_message ? `<div class="rule"></div><div class="center" style="font-weight:700">${escapeHtml(data.custom_slip_message)}</div>` : ''}
   ${reviewQrHtml(data)}
   <div class="rule"></div>
   ${poweredFooter(data)}
 </section>`;
 }
 
-/** Kitchen ticket — qty, item, and unit price (no totals or marketing footer). */
+/** Kitchen ticket — qty, item, unit price, and custom slip message. */
 function kitchenTicketHtml(data, { pageBreakAfter = false } = {}) {
+    const message = String(data.custom_slip_message || '').trim();
     return `
 <section class="slip${pageBreakAfter ? ' slip-cut' : ''}">
   <div class="copy-title">For Kitchen</div>
@@ -446,6 +446,7 @@ function kitchenTicketHtml(data, { pageBreakAfter = false } = {}) {
   </div>
   <div class="rule"></div>
   ${itemsTable(data, { mode: 'kitchen' })}
+  ${message ? `<div class="rule"></div><div class="center" style="font-weight:700">${escapeHtml(message)}</div>` : ''}
   <div class="rule"></div>
 </section>`;
 }
