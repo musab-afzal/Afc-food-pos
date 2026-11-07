@@ -58,14 +58,29 @@ class Dish extends Model
         if (str_starts_with($image, 'http://') || str_starts_with($image, 'https://') || str_starts_with($image, 'data:')) {
             return $image;
         }
-        if (str_starts_with($image, '/storage/')) {
-            return $image;
+        if (str_starts_with($image, '/uploads/') || str_starts_with($image, '/media/') || str_starts_with($image, '/storage/')) {
+            return str_starts_with($image, '/storage/')
+                ? '/media/'.ltrim(substr($image, strlen('/storage/')), '/')
+                : $image;
         }
-        if (str_starts_with($image, 'storage/')) {
+        if (str_starts_with($image, 'uploads/')) {
             return '/'.$image;
         }
+        if (str_starts_with($image, 'media/')) {
+            return '/'.$image;
+        }
+        if (str_starts_with($image, 'storage/')) {
+            return '/media/'.ltrim(substr($image, strlen('storage/')), '/');
+        }
 
-        return '/storage/'.ltrim($image, '/');
+        // Prefer mirrored public uploads when present (Hostinger-safe).
+        $basename = basename($image);
+        if ($basename !== '' && is_file(public_path('uploads/dishes/'.$basename))) {
+            return '/uploads/dishes/'.$basename;
+        }
+
+        // Fallback: Laravel media route reads storage/app/public (no symlink required).
+        return '/media/'.ltrim($image, '/');
     }
 
     protected function casts(): array

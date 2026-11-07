@@ -124,7 +124,18 @@ class DishController extends Controller
             ], 500);
         }
 
-        $url = '/storage/'.ltrim($path, '/');
+        // Mirror into the web root so Hostinger can serve images even without a storage symlink.
+        $publicDir = public_path('uploads/dishes');
+        if (! is_dir($publicDir)) {
+            mkdir($publicDir, 0755, true);
+        }
+        $publicAbsolute = $publicDir.DIRECTORY_SEPARATOR.$name;
+        $storedAbsolute = Storage::disk('public')->path($path);
+        if (is_file($storedAbsolute)) {
+            @copy($storedAbsolute, $publicAbsolute);
+        }
+
+        $url = '/uploads/dishes/'.$name;
 
         return response()->json([
             'success' => true,
