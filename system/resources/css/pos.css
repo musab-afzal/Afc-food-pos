@@ -35,11 +35,17 @@
 .afc-pos-motto span { display: block; width: 75px; height: 4px; margin-top: 10px; background: #3c6178; border-radius: 5px; }
 .afc-pos-main { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
 .afc-pos-header { height: 79px; flex-shrink: 0; display: flex; align-items: center; gap: 24px; padding: 12px 27px; background: #f8fafc; border-bottom: 1px solid var(--pos-border); box-shadow: 0 3px 12px #16365805; }
-.afc-pos-search { display: flex; align-items: center; gap: 16px; flex: 1; min-width: 0; height: 50px; padding: 0 16px; border: 1px solid var(--pos-border); border-radius: 11px; background: white; }
+.afc-pos-search-row { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
+.afc-pos-search { display: flex; align-items: center; gap: 16px; flex: 1.15; min-width: 0; height: 50px; padding: 0 16px; border: 1px solid var(--pos-border); border-radius: 11px; background: white; }
+.afc-pos-customer-search { position: relative; flex: 0.85; min-width: 180px; }
+.afc-pos-customer-search-field { width: 100%; flex: none; }
+.afc-pos-customer-clear { display: grid; place-items: center; flex-shrink: 0; width: 28px; height: 28px; border-radius: 8px; color: #536887; }
+.afc-pos-customer-clear:hover { background: #edf3f9; }
 .afc-pos-search svg { flex-shrink: 0; }
 .afc-pos-search input { width: 100%; min-width: 0; border: 0; background: transparent; outline: none; color: var(--pos-text); font-size: 15px; }
 .afc-pos-search input::placeholder { color: #7585a1; }
 .afc-pos-search kbd { flex-shrink: 0; border-radius: 7px; padding: 4px 8px; font-size: 11px; background: #edf3f9; color: #48617e; }
+.afc-pos-order-details-notes { grid-template-columns: 1fr auto; }
 .afc-pos-register { display: flex; align-items: center; gap: 12px; border-left: 1px solid var(--pos-border); padding-left: 17px; white-space: nowrap; }
 .afc-pos-register > svg { color: #ff8a00; }
 .afc-pos-register strong, .afc-pos-user strong { display: block; font-size: 14px; font-weight: 750; }
@@ -200,11 +206,13 @@
     .afc-pos { height: auto; min-height: 100dvh; overflow: visible; grid-template-columns: 68px minmax(0, 1fr); }
     .afc-pos-sidebar { position: sticky; top: 0; height: 100dvh; }
     .afc-pos-body { grid-template-columns: minmax(0, 1fr); }
-    .afc-pos-header { padding: 12px; gap: 10px; }
+    .afc-pos-header { height: auto; flex-wrap: wrap; padding: 12px; gap: 10px; }
+    .afc-pos-search-row { flex: 1 1 100%; order: 3; }
     .afc-pos-user { border: 0; padding: 0; }
     .afc-pos-user-name, .afc-pos-user > svg, .afc-pos-search kbd { display: none; }
     .afc-pos-avatar { width: 36px; height: 36px; font-size: 12px; }
     .afc-pos-search { gap: 8px; padding-inline: 10px; }
+    .afc-pos-customer-search { min-width: 140px; }
     .afc-pos-search input { font-size: 13px; }
     .afc-pos-products { flex: auto; max-height: 570px; overflow: auto; }
     .afc-pos-checkout { min-height: 650px; }

@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import NotificationBell from '../../../components/NotificationBell.jsx';
 import { usePos } from '../context/PosContext.jsx';
+import CustomerBlock from './CustomerBlock.jsx';
 
 export default function PosHeader() {
     const { state, user, patch, searchRef, handleBarcodeEnter, can, loadRecent } = usePos();
@@ -26,21 +27,27 @@ export default function PosHeader() {
 
     return (
         <header className="afc-pos-header">
-            <div className="afc-pos-search">
-                <Search size={23} aria-hidden="true" />
-                <input
-                    ref={searchRef}
-                    value={state.query}
-                    onChange={(event) => patch({ query: event.target.value })}
-                    onKeyDown={(event) => { if (event.key === 'Enter') handleBarcodeEnter(); }}
-                    placeholder="Search for menu items, e.g. burger, pizza, drink..."
-                    aria-label="Search menu items, SKU or barcode"
-                />
-                <kbd title="Search shortcut">Ctrl K</kbd>
+            <div className="afc-pos-search-row">
+                <div className="afc-pos-search">
+                    <Search size={23} aria-hidden="true" />
+                    <input
+                        ref={searchRef}
+                        value={state.query}
+                        onChange={(event) => patch({ query: event.target.value })}
+                        onKeyDown={(event) => { if (event.key === 'Enter') handleBarcodeEnter(); }}
+                        placeholder="Search for menu items, e.g. burger, pizza, drink..."
+                        aria-label="Search menu items, SKU or barcode"
+                    />
+                    <kbd title="Search shortcut">Ctrl K</kbd>
+                </div>
+                <CustomerBlock compact />
             </div>
             <div className="afc-pos-register">
                 <Sun size={32} strokeWidth={1.6} />
-                <div><strong>{state.register ? 'Register Open' : 'Current Session'}</strong><small>{openedAt ? `Opened ${new Date(openedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : state.online ? 'Ready to take orders' : 'Working offline'}</small></div>
+                <div>
+                    <strong>{state.register ? 'Register Open' : 'Current Session'}</strong>
+                    <small>{openedAt ? `Opened ${new Date(openedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : state.online ? 'Ready to take orders' : 'Working offline'}</small>
+                </div>
             </div>
             <div className="afc-pos-user-wrap">
                 <button type="button" className="afc-pos-user" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>
@@ -48,14 +55,16 @@ export default function PosHeader() {
                     <span className="afc-pos-user-name"><strong>{user?.name || 'Staff'}</strong><small>{user?.roles?.[0] || 'Cashier'}</small></span>
                     <ChevronDown size={17} />
                 </button>
-                {menuOpen && <>
-                    <button type="button" className="fixed inset-0 z-20 cursor-default" aria-label="Close cashier menu" onClick={() => setMenuOpen(false)} />
-                    <div className="afc-pos-user-menu">
-                        <p>{state.online ? <Cloud size={16} /> : <CloudOff size={16} />}{state.online ? 'Online' : 'Offline'}{state.sync.pending ? ` · ${state.sync.pending} pending` : ''}</p>
-                        <button type="button" onClick={toggleFullscreen}>{fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />} {fullscreen ? 'Exit fullscreen' : 'Fullscreen'}</button>
-                        {can('orders.view') && <button type="button" onClick={() => { loadRecent(); setMenuOpen(false); }}><UserRound size={16} /> Recent sales</button>}
-                    </div>
-                </>}
+                {menuOpen && (
+                    <>
+                        <button type="button" className="fixed inset-0 z-20 cursor-default" aria-label="Close cashier menu" onClick={() => setMenuOpen(false)} />
+                        <div className="afc-pos-user-menu">
+                            <p>{state.online ? <Cloud size={16} /> : <CloudOff size={16} />}{state.online ? 'Online' : 'Offline'}{state.sync.pending ? ` · ${state.sync.pending} pending` : ''}</p>
+                            <button type="button" onClick={toggleFullscreen}>{fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />} {fullscreen ? 'Exit fullscreen' : 'Fullscreen'}</button>
+                            {can('orders.view') && <button type="button" onClick={() => { loadRecent(); setMenuOpen(false); }}><UserRound size={16} /> Recent sales</button>}
+                        </div>
+                    </>
+                )}
             </div>
             <NotificationBell />
         </header>

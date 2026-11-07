@@ -36,7 +36,8 @@ export default function FinanceDashboardPage() {
                 breadcrumbs={['Finance', 'Dashboard']}
                 actions={(
                     <div className="flex flex-wrap gap-2">
-                        <Link to="/finance/expenses" className="btn-primary">Expenses</Link>
+                        <Link to="/finance/sales" className="btn-primary">Sales</Link>
+                        <Link to="/finance/expenses" className="rounded-xl border border-ink/10 bg-white px-4 py-2.5 text-sm font-semibold">Expenses</Link>
                         <Link to="/finance/cash-register" className="rounded-xl border border-ink/10 bg-white px-4 py-2.5 text-sm font-semibold">Cash register</Link>
                     </div>
                 )}

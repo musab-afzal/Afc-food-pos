@@ -87,11 +87,20 @@ class DishController extends Controller
     {
         $before = $dish->toArray();
         DB::transaction(function () use ($request, $dish, $activityLogger, $before): void {
-            $dish->update(['is_active' => false, 'is_available' => false, 'pos_enabled' => false, 'qr_enabled' => false]);
-            $activityLogger->log($request, 'dish.archived', 'menu', $dish, $before, $dish->fresh()->toArray());
+            $dish->update([
+                'is_active' => false,
+                'is_available' => false,
+                'pos_enabled' => false,
+                'qr_enabled' => false,
+            ]);
+            $activityLogger->log($request, 'dish.deleted', 'menu', $dish, $before, [
+                'is_active' => false,
+                'deleted' => true,
+            ]);
+            $dish->delete();
         });
 
-        return response()->json(['success' => true, 'message' => 'Dish archived. Historical sales were preserved.']);
+        return response()->json(['success' => true, 'message' => 'Dish deleted. Historical sales were preserved.']);
     }
 
     /** Upload a dish image to public storage; returns path + URL for the form. */
@@ -102,15 +111,27 @@ class DishController extends Controller
         ]);
 
         $file = $request->file('image');
-        $name = Str::uuid()->toString().'.'.$file->getClientOriginalExtension();
+        $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension() ?: 'jpg');
+        $name = Str::uuid()->toString().'.'.$extension;
         $path = $file->storeAs('dishes', $name, 'public');
+
+        if (! is_string($path) || $path === '' || ! Storage::disk('public')->exists($path)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Image upload failed. Could not save the file.',
+                'data' => null,
+                'errors' => ['image' => ['Image upload failed. Could not save the file.']],
+            ], 500);
+        }
+
+        $url = '/storage/'.ltrim($path, '/');
 
         return response()->json([
             'success' => true,
             'message' => 'Image uploaded.',
             'data' => [
                 'path' => $path,
-                'url' => Storage::disk('public')->url($path),
+                'url' => $url,
             ],
         ]);
     }

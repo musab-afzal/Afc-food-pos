@@ -296,7 +296,7 @@ function formatPlainAmount(value) {
     });
 }
 
-function renderItems(data) {
+function renderItems(data, { showPrices = true } = {}) {
     return data.items.map((item) => {
         const details = [];
         (item.addons || []).forEach((addon) => {
@@ -308,6 +308,12 @@ function renderItems(data) {
         });
         if (item.notes) details.push(`<span class="item-note">${escapeHtml(item.notes)}</span>`);
         const name = `${escapeHtml(item.dish_name)}${item.variant_name ? ` (${escapeHtml(item.variant_name)})` : ''}`;
+        if (!showPrices) {
+            return `<tr>
+          <td class="qty">${escapeHtml(item.quantity)}</td>
+          <td><div class="item-name">${name}</div>${details.join('')}</td>
+        </tr>`;
+        }
         return `<tr>
           <td class="qty">${escapeHtml(item.quantity)}</td>
           <td><div class="item-name">${name}</div>${details.join('')}</td>
@@ -317,7 +323,19 @@ function renderItems(data) {
     }).join('');
 }
 
-function itemsTable(data) {
+function itemsTable(data, { showPrices = true } = {}) {
+    if (!showPrices) {
+        return `
+  <table class="items">
+    <thead>
+      <tr>
+        <th class="qty">Qty</th>
+        <th>Item</th>
+      </tr>
+    </thead>
+    <tbody>${renderItems(data, { showPrices: false })}</tbody>
+  </table>`;
+    }
     return `
   <table class="items">
     <thead>
@@ -328,7 +346,7 @@ function itemsTable(data) {
         <th class="num total">Total</th>
       </tr>
     </thead>
-    <tbody>${renderItems(data)}</tbody>
+    <tbody>${renderItems(data, { showPrices: true })}</tbody>
   </table>`;
 }
 
@@ -412,11 +430,8 @@ function customerInvoiceHtml(data, { pageBreakAfter = false } = {}) {
 </section>`;
 }
 
-/** Kitchen ticket — matches provided “For Kitchen” design. */
+/** Kitchen ticket — qty + item only (no prices, totals, or marketing footer). */
 function kitchenTicketHtml(data, { pageBreakAfter = false } = {}) {
-    const money = (v) => formatReceiptMoney(v, data.currency);
-    const subtotal = Number(data.totals.subtotal ?? data.totals.grand_total ?? 0);
-
     return `
 <section class="slip${pageBreakAfter ? ' slip-cut' : ''}">
   <div class="copy-title">For Kitchen</div>
@@ -428,13 +443,8 @@ function kitchenTicketHtml(data, { pageBreakAfter = false } = {}) {
     ${metaRow('Order Type', labelOrderType(data.order_type))}
   </div>
   <div class="rule"></div>
-  ${itemsTable(data)}
+  ${itemsTable(data, { showPrices: false })}
   <div class="rule"></div>
-  <div class="totals">
-    <div class="total-row grand"><span>Subtotal</span><span>${money(subtotal)}</span></div>
-  </div>
-  <div class="rule"></div>
-  ${poweredFooter(data)}
 </section>`;
 }
 

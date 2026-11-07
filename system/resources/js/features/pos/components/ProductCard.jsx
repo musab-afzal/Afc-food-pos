@@ -1,10 +1,11 @@
 ﻿import { Layers3, Plus, Utensils } from 'lucide-react';
+import { mediaUrl } from '../../../utils/media.js';
 import { money, toCents } from '../utils/cart.js';
 
 export default function ProductCard({ dish, onSelect }) {
     const unavailable = dish.is_available === false;
     const hasOptions = Boolean(dish.variants?.length || dish.addons?.length);
-    const image = dish.image_url || dish.image;
+    const image = mediaUrl(dish.image_url || dish.image);
     return (
         <button type="button" disabled={unavailable} onClick={() => onSelect(dish)} className="afc-pos-product" aria-label={`${hasOptions ? 'Customize' : 'Add'} ${dish.name}, ${money(toCents(dish.price))}`}>
             <div className="afc-pos-product-image">

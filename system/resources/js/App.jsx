@@ -49,6 +49,7 @@ import CashRegisterPage from './pages/finance/CashRegisterPage.jsx';
 import ExpenseCategoriesPage from './pages/finance/ExpenseCategoriesPage.jsx';
 import ExpensesPage from './pages/finance/ExpensesPage.jsx';
 import FinanceDashboardPage from './pages/finance/FinanceDashboardPage.jsx';
+import FinanceSalesPage from './pages/finance/FinanceSalesPage.jsx';
 import IncomesPage from './pages/finance/IncomesPage.jsx';
 import LedgerPage from './pages/finance/LedgerPage.jsx';
 import PaymentMethodsPage from './pages/finance/PaymentMethodsPage.jsx';
@@ -153,6 +154,7 @@ export default function App() {
                     <Route path="/rider-settlements" element={<ProtectedRoute permission="riders.view"><SettlementsPage /></ProtectedRoute>} />
 
                     <Route path="/finance" element={<ProtectedRoute permission="finance.view"><FinanceDashboardPage /></ProtectedRoute>} />
+                    <Route path="/finance/sales" element={<ProtectedRoute permission="finance.view"><FinanceSalesPage /></ProtectedRoute>} />
                     <Route path="/finance/expenses" element={<ProtectedRoute permission="expenses.view"><ExpensesPage /></ProtectedRoute>} />
                     <Route path="/finance/expense-categories" element={<ProtectedRoute permission="expenses.manage"><ExpenseCategoriesPage /></ProtectedRoute>} />
                     <Route path="/finance/incomes" element={<ProtectedRoute permission="finance.view"><IncomesPage /></ProtectedRoute>} />

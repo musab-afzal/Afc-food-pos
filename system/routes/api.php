@@ -507,7 +507,7 @@ Route::prefix('v1')->group(function (): void {
         // Reports (read-only, from/to query params; default month-to-date)
         Route::prefix('reports')->group(function (): void {
             Route::get('overview', [ReportController::class, 'overview'])->middleware('permission:reports.overview,reports.view');
-            Route::get('sales', [ReportController::class, 'sales'])->middleware('permission:reports.sales');
+            Route::get('sales', [ReportController::class, 'sales'])->middleware('permission:reports.sales,finance.view');
             Route::get('dishes', [ReportController::class, 'dishes'])->middleware('permission:reports.sales');
             Route::get('inventory', [ReportController::class, 'inventory'])->middleware('permission:reports.inventory');
             Route::get('purchases', [ReportController::class, 'purchases'])->middleware('permission:reports.purchases');

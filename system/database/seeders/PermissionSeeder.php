@@ -146,7 +146,7 @@ class PermissionSeeder extends Seeder
             'orders.view', 'orders.create', 'orders.update', 'orders.cancel', 'orders.assign_rider',
             'kitchen.view', 'kitchen.accept', 'kitchen.ready', 'kitchen.complete',
             'tables.view', 'tables.manage', 'tables.reservations',
-            'menu.view', 'menu.create', 'menu.edit',
+            'menu.view', 'menu.create', 'menu.edit', 'menu.delete',
             'customers.view', 'customers.create', 'customers.edit', 'customers.loyalty',
             'inventory.view', 'inventory.create', 'inventory.edit',
             'purchases.view', 'purchases.create',

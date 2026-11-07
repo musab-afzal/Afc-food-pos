@@ -1,5 +1,4 @@
-import { Banknote, ChevronRight, CreditCard, GitFork, Map as MapIcon, Minus, Pause, Plus, Printer, QrCode, ShoppingBag, Tag, Trash2, Utensils, Wallet } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Banknote, ChevronRight, CreditCard, GitFork, Minus, Pause, Plus, Printer, QrCode, ShoppingBag, Tag, Trash2, UserPlus, Utensils, Wallet } from 'lucide-react';
 
 import { usePos } from '../context/PosContext.jsx';
 import { cartItemLabel, money } from '../utils/cart.js';
@@ -29,7 +28,15 @@ export default function CartPanel() {
         <aside className="afc-pos-checkout" aria-label="Current order and checkout">
             <div className="afc-pos-checkout-top">
                 <button type="button" onClick={newOrder} className="afc-pos-button afc-pos-button-primary"><Plus size={23} /> New Order</button>
-                {can('tables.view') ? <Link to="/tables/floor" className="afc-pos-button"><MapIcon size={24} /> View Floor Plan</Link> : <button type="button" className="afc-pos-button" onClick={() => patch({ orderType: 'dine_in', tablePickerOpen: true })}><MapIcon size={24} /> View Tables</button>}
+                {can('customers.create') ? (
+                    <button type="button" className="afc-pos-button" onClick={() => patch({ customerModalOpen: true })}>
+                        <UserPlus size={24} /> Quick Add Customer
+                    </button>
+                ) : (
+                    <button type="button" className="afc-pos-button" disabled title="No permission to create customers">
+                        <UserPlus size={24} /> Quick Add Customer
+                    </button>
+                )}
             </div>
             <section className="afc-pos-order">
                 <header className="afc-pos-order-heading"><div><h2>Current Order</h2>{state.orderType === 'dine_in' && <p className="afc-pos-table-cart-label">{selectedTable?.name || 'Select a table to start'}</p>}</div><button type="button" disabled={!state.cart.length || state.holding || state.paying} onClick={() => patch({ clearConfirm: true })}><Trash2 size={17} /> Clear All</button></header>

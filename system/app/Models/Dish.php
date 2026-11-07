@@ -11,7 +11,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\Storage;
 
 #[Fillable(['category_id', 'brand_id', 'name', 'slug', 'sku', 'barcode', 'description', 'short_description', 'image', 'base_price', 'tax_percent', 'preparation_minutes', 'is_active', 'is_available', 'dine_in_enabled', 'takeaway_enabled', 'delivery_enabled', 'qr_enabled', 'pos_enabled', 'kitchen_enabled', 'sort_order'])]
 class Dish extends Model
@@ -49,7 +48,7 @@ class Dish extends Model
         return $this->hasOne(Recipe::class)->whereNull('dish_variant_id');
     }
 
-    /** Public URL for the dish image (supports absolute URLs and storage paths). */
+    /** Public URL for the dish image (root-relative so it works across local hosts/ports). */
     public function imageUrl(): ?string
     {
         $image = trim((string) $this->image);
@@ -62,8 +61,11 @@ class Dish extends Model
         if (str_starts_with($image, '/storage/')) {
             return $image;
         }
+        if (str_starts_with($image, 'storage/')) {
+            return '/'.$image;
+        }
 
-        return Storage::disk('public')->url(ltrim($image, '/'));
+        return '/storage/'.ltrim($image, '/');
     }
 
     protected function casts(): array

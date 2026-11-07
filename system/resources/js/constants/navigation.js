@@ -128,6 +128,7 @@ export const navigation = [
                 permission: 'finance.view',
                 children: [
                     { to: '/finance', label: 'Dashboard' },
+                    { to: '/finance/sales', label: 'Sales', permission: 'finance.view' },
                     { to: '/finance/expenses', label: 'Expenses', permission: 'expenses.view' },
                     { to: '/finance/expense-categories', label: 'Expense categories', permission: 'expenses.manage' },
                     { to: '/finance/incomes', label: 'Income' },

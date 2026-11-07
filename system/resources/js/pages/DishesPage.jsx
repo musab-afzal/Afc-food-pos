@@ -1,4 +1,4 @@
-import { Archive, Edit3, ImagePlus, Plus, Trash2, UtensilsCrossed, X } from 'lucide-react';
+import { Edit3, ImagePlus, Plus, Trash2, UtensilsCrossed, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import DataTable from '../components/DataTable.jsx';
@@ -10,9 +10,10 @@ import StatusBadge from '../components/StatusBadge.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { usePaginatedResource } from '../hooks/usePaginatedResource.js';
 import { api } from '../services/api.js';
+import { mediaUrl } from '../utils/media.js';
 
 function dishImageSrc(dish) {
-    return dish?.image_url || dish?.image || '';
+    return mediaUrl(dish?.image_url || dish?.image || '');
 }
 
 const defaults = { category_id: '', brand_id: null, name: '', slug: '', sku: '', barcode: '', description: '', short_description: '', image: '', base_price: '', tax_percent: 0, preparation_minutes: 10, is_active: true, is_available: true, dine_in_enabled: true, takeaway_enabled: true, delivery_enabled: true, qr_enabled: true, pos_enabled: true, kitchen_enabled: true, sort_order: 0, variants: [] };
@@ -29,7 +30,7 @@ export default function DishesPage() {
     const [editing, setEditing] = useState(null);
     const [form, setForm] = useState(defaults);
     const [formErrors, setFormErrors] = useState({});
-    const [archiving, setArchiving] = useState(null);
+    const [deleting, setDeleting] = useState(null);
     const [busy, setBusy] = useState(false);
     const [notice, setNotice] = useState('');
     const [removedVariantIds, setRemovedVariantIds] = useState([]);
@@ -95,9 +96,9 @@ export default function DishesPage() {
             body.append('image', file);
             const response = await api('/dishes/upload-image', { method: 'POST', body });
             const path = response.data?.path || '';
-            const url = response.data?.url || '';
+            const url = mediaUrl(response.data?.url || path);
             setForm((current) => ({ ...current, image: path }));
-            setImagePreview(url || path);
+            setImagePreview(url);
         } catch (caught) {
             setFormErrors((current) => ({ ...current, image: [caught.message] }));
         } finally {
@@ -122,11 +123,18 @@ export default function DishesPage() {
         } catch (caught) { setFormErrors(caught.errors || { general: [caught.message] }); }
         finally { setBusy(false); }
     }
-    async function archive() {
+    async function deleteDish() {
         setBusy(true);
-        try { const response = await api(`/dishes/${archiving.id}`, { method: 'DELETE' }); setNotice(response.message); setArchiving(null); await reload(); }
-        catch (caught) { setNotice(caught.message); }
-        finally { setBusy(false); }
+        try {
+            const response = await api(`/dishes/${deleting.id}`, { method: 'DELETE' });
+            setNotice(response.message);
+            setDeleting(null);
+            await reload();
+        } catch (caught) {
+            setNotice(caught.message);
+        } finally {
+            setBusy(false);
+        }
     }
     const columns = [
         {
@@ -161,9 +169,9 @@ export default function DishesPage() {
                             <Edit3 size={14} /> Edit
                         </button>
                     )}
-                    {can('menu.delete') && row.is_active && (
-                        <button type="button" onClick={() => setArchiving(row)} className="inline-flex items-center gap-1 rounded-[5px] px-2.5 py-1.5 text-xs font-bold text-coral hover:bg-coral/5" title="Archive dish">
-                            <Archive size={14} /> Remove
+                    {can('menu.delete') && (
+                        <button type="button" onClick={() => setDeleting(row)} className="inline-flex items-center gap-1 rounded-[5px] px-2.5 py-1.5 text-xs font-bold text-coral hover:bg-coral/5" title="Delete dish">
+                            <Trash2 size={14} /> Delete
                         </button>
                     )}
                 </div>
@@ -200,7 +208,7 @@ export default function DishesPage() {
                 <select value={filters.is_active} onChange={(event) => setFilters((f) => ({ ...f, is_active: event.target.value, page: 1 }))} className="field max-w-xs">
                     <option value="">All statuses</option>
                     <option value="1">Active</option>
-                    <option value="0">Archived</option>
+                    <option value="0">Inactive</option>
                 </select>
             </ListFilters>
             <DataTable columns={columns} rows={rows} loading={loading} emptyMessage="No dishes match these filters." />
@@ -300,7 +308,7 @@ export default function DishesPage() {
                     {formErrors.general && <p className="text-sm text-coral">{formErrors.general[0]}</p>}
                 </div>
             </FormModal>
-            <ConfirmDialog open={Boolean(archiving)} title="Remove dish?" message={`${archiving?.name || 'This dish'} will be removed from POS and QR ordering. Existing sales keep their snapshot data.`} onCancel={() => setArchiving(null)} onConfirm={archive} busy={busy} confirmLabel="Remove" />
+            <ConfirmDialog open={Boolean(deleting)} title="Delete dish?" message={`${deleting?.name || 'This dish'} will be deleted from the menu and POS. Existing sales keep their snapshot data.`} onCancel={() => setDeleting(null)} onConfirm={deleteDish} busy={busy} confirmLabel="Delete" />
         </div>
     );
 }

@@ -1,6 +1,5 @@
 import { ChevronDown, RefreshCw, ShoppingBag, Table2, Truck, UserRound, Utensils } from 'lucide-react';
 import { usePos } from '../context/PosContext.jsx';
-import CustomerBlock from './CustomerBlock.jsx';
 
 const types = [['dine_in', 'Dine In', Utensils], ['takeaway', 'Takeaway', ShoppingBag], ['delivery', 'Delivery', Truck]];
 
@@ -53,31 +52,29 @@ export default function OrderToolbar() {
                 </button>
             </div>
 
-            <div className="afc-pos-order-details">
-                <div>
-                    <label className="text-xs font-semibold">
-                        Customer{state.catalog?.settings?.require_customer ? ' (required)' : ''}
+            {notesOpen && (
+                <div className="afc-pos-order-details afc-pos-order-details-notes">
+                    {state.selectedCustomer && (
+                        <p className="text-sm text-ink/60">
+                            Customer: <strong className="text-ink">{state.selectedCustomer.name}</strong>
+                            {state.selectedCustomer.phone ? ` · ${state.selectedCustomer.phone}` : ''}
+                        </p>
+                    )}
+                    <label className="flex flex-col gap-2 text-xs font-semibold">
+                        Order notes
+                        <textarea
+                            rows={2}
+                            className="rounded-lg border border-[#dbe3ed] bg-white p-2 text-sm font-normal"
+                            value={state.orderNotes}
+                            onChange={(event) => patch({ orderNotes: event.target.value })}
+                            placeholder="Special requests or kitchen notes"
+                        />
                     </label>
-                    <CustomerBlock />
+                    <button type="button" className="afc-pos-button" onClick={loadCatalog} disabled={state.loading}>
+                        <RefreshCw size={15} /> Refresh menu
+                    </button>
                 </div>
-                {notesOpen && (
-                    <>
-                        <label className="flex flex-col gap-2 text-xs font-semibold">
-                            Order notes
-                            <textarea
-                                rows={2}
-                                className="rounded-lg border border-[#dbe3ed] bg-white p-2 text-sm font-normal"
-                                value={state.orderNotes}
-                                onChange={(event) => patch({ orderNotes: event.target.value })}
-                                placeholder="Special requests or kitchen notes"
-                            />
-                        </label>
-                        <button type="button" className="afc-pos-button" onClick={loadCatalog} disabled={state.loading}>
-                            <RefreshCw size={15} /> Refresh menu
-                        </button>
-                    </>
-                )}
-            </div>
+            )}
         </div>
     );
 }
