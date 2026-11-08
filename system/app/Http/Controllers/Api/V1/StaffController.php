@@ -74,15 +74,14 @@ class StaffController extends Controller
 
                 if ($roleId && $request->filled('email')) {
                     $role = Role::query()->findOrFail((int) $roleId);
+                    // New logins are always active. Employment status must not control User Access.
                     $user = User::query()->create([
                         'name' => trim($data['first_name'].' '.$data['last_name']),
                         'email' => $data['email'],
                         'phone' => $data['phone'] ?? null,
                         'password' => $password ?: Hash::make(str()->random(16)),
-                        'is_active' => ($data['status'] ?? 'active') === 'active',
-                        'status' => in_array($data['status'] ?? 'active', ['active', 'inactive', 'suspended'], true)
-                            ? $data['status']
-                            : 'active',
+                        'is_active' => true,
+                        'status' => 'active',
                     ]);
                     $roleService->assignUserRole($request->user(), $user, $role);
                     $data['user_id'] = $user->id;
@@ -118,12 +117,13 @@ class StaffController extends Controller
 
                 if ($staff->user_id) {
                     $user = $staff->user;
+                    // Employment status must NEVER rewrite login access.
+                    // Editing an employee (including status) used to force is_active=false and looked like "auto deactivate".
+                    // Login activate/deactivate is only via User Access (or staff archive below).
                     $user?->update([
                         'name' => trim($staff->first_name.' '.$staff->last_name),
                         'email' => $staff->email ?: $user->email,
                         'phone' => $staff->phone,
-                        'is_active' => $staff->status === 'active',
-                        'status' => in_array($staff->status, ['active', 'inactive', 'suspended'], true) ? $staff->status : $user->status,
                         ...($password ? ['password' => $password] : []),
                     ]);
                     if ($roleId && $user) {
@@ -137,8 +137,8 @@ class StaffController extends Controller
                         'email' => $staff->email,
                         'phone' => $staff->phone,
                         'password' => $password ?: Hash::make(str()->random(16)),
-                        'is_active' => $staff->status === 'active',
-                        'status' => $staff->status === 'active' ? 'active' : 'inactive',
+                        'is_active' => true,
+                        'status' => 'active',
                     ]);
                     $roleService->assignUserRole($request->user(), $user, $role);
                     $staff->update(['user_id' => $user->id]);
@@ -153,18 +153,16 @@ class StaffController extends Controller
         return $this->success('Staff updated.', $staff->fresh()->load(['user.roles', 'shifts']));
     }
 
-    public function destroy(Request $request, Staff $staff, ActivityLogger $activityLogger): JsonResponse
+    public function destroy(Request $request, Staff $staff, ActivityLogger $activityLogger, RoleService $roleService): JsonResponse
     {
         $before = $staff->toArray();
         DB::transaction(function () use ($request, $staff, $activityLogger, $before): void {
+            // Employment only — never touch login is_active/status here.
+            // Disabling an employee used to deactivate User Access (and locked Super Admin out of live).
             $staff->update(['status' => 'inactive']);
-            if ($staff->user_id) {
-                $staff->user?->update(['is_active' => false, 'status' => 'inactive']);
-                $staff->user?->tokens()->delete();
-            }
             $activityLogger->log($request, 'staff.archived', 'staff', $staff, $before, $staff->fresh()->toArray());
         });
 
-        return $this->success('Staff archived.');
+        return $this->success('Employee disabled. Login access is unchanged — manage that from User Access.');
     }
 }

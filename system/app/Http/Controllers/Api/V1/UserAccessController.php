@@ -52,6 +52,7 @@ class UserAccessController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
+                'phone' => $user->phone,
                 'employee_id' => $user->staff?->employee_id,
                 'status' => $user->status,
                 'is_active' => $user->is_active,
@@ -124,6 +125,7 @@ class UserAccessController extends Controller
         $isActive = $status === 'active';
 
         if (! $isActive) {
+            // Nobody can lock themselves out — including Super Admin.
             if ($request->user()?->id === $user->id) {
                 return $this->error('You cannot deactivate your own account.', 422, [
                     'status' => ['You cannot deactivate your own account.'],
@@ -151,12 +153,7 @@ class UserAccessController extends Controller
             'is_active' => $isActive,
         ]);
 
-        if ($user->staff) {
-            $user->staff->update([
-                'status' => $isActive ? 'active' : 'inactive',
-            ]);
-        }
-
+        // Do not rewrite employment status here — login access is independent of "on leave" / job status.
         if (! $isActive) {
             $user->tokens()->delete();
         }
@@ -177,6 +174,129 @@ class UserAccessController extends Controller
             'status' => $user->status,
             'is_active' => $user->is_active,
         ]);
+    }
+
+    public function update(Request $request, User $user, ActivityLogger $activityLogger): JsonResponse
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:120'],
+            'email' => ['required', 'email', 'max:190', 'unique:users,email,'.$user->id],
+            'phone' => ['nullable', 'string', 'max:30'],
+            'password' => ['nullable', 'string', 'min:8', 'max:100'],
+            'role_id' => ['nullable', 'integer', 'exists:roles,id'],
+            'confirm_super_admin' => ['sometimes', 'boolean'],
+            'status' => ['nullable', 'string', 'in:active,inactive,suspended'],
+        ]);
+
+        $before = $user->only(['name', 'email', 'phone', 'status', 'is_active']);
+
+        try {
+            if (isset($data['role_id'])) {
+                $role = Role::query()->findOrFail((int) $data['role_id']);
+                if ($role->slug === 'super_admin' && ! $request->boolean('confirm_super_admin')) {
+                    return $this->error('Confirm granting unrestricted Super Admin access.', 422, [
+                        'confirm_super_admin' => ['Confirmation required to assign Super Admin.'],
+                    ]);
+                }
+                $this->roles->assignUserRole($request->user(), $user, $role);
+            }
+
+            $updates = [
+                'name' => trim($data['name']),
+                'email' => $data['email'],
+                'phone' => $data['phone'] ?? null,
+            ];
+            if (! empty($data['password'])) {
+                $updates['password'] = $data['password'];
+            }
+            if (isset($data['status'])) {
+                if ($data['status'] !== 'active') {
+                    if ($request->user()?->id === $user->id) {
+                        return $this->error('You cannot deactivate your own account.', 422, [
+                            'status' => ['You cannot deactivate your own account.'],
+                        ]);
+                    }
+                    $this->roles->assertNotLastSuperAdmin($user);
+                    $updates['status'] = $data['status'];
+                    $updates['is_active'] = false;
+                } else {
+                    $updates['status'] = 'active';
+                    $updates['is_active'] = true;
+                }
+            }
+
+            $user->update($updates);
+            if (isset($updates['is_active']) && $updates['is_active'] === false) {
+                $user->tokens()->delete();
+            }
+
+            if ($user->staff) {
+                $parts = preg_split('/\s+/', trim($user->name), 2) ?: [$user->name];
+                $user->staff->update([
+                    'first_name' => $parts[0] ?? $user->name,
+                    'last_name' => $parts[1] ?? '',
+                    'email' => $user->email,
+                    'phone' => $user->phone,
+                ]);
+            }
+
+            $activityLogger->log($request, 'user.updated', 'users', $user, $before, $user->fresh()->only(['name', 'email', 'phone', 'status', 'is_active']));
+        } catch (ValidationException $e) {
+            return $this->error(collect($e->errors())->flatten()->first() ?: 'Validation failed.', 422, $e->errors());
+        }
+
+        $user->load(['roles:id,name,slug,is_active', 'staff:id,user_id,employee_id,status']);
+        $role = $user->roles->first();
+
+        return $this->success('User updated.', [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'phone' => $user->phone,
+            'employee_id' => $user->staff?->employee_id,
+            'status' => $user->status,
+            'is_active' => $user->is_active,
+            'role' => $role ? [
+                'id' => $role->id,
+                'name' => $role->name,
+                'slug' => $role->slug,
+            ] : null,
+        ]);
+    }
+
+    public function destroy(Request $request, User $user, ActivityLogger $activityLogger): JsonResponse
+    {
+        if ($request->user()?->id === $user->id) {
+            return $this->error('You cannot delete your own account.', 422, [
+                'user' => ['You cannot delete your own account.'],
+            ]);
+        }
+
+        try {
+            $this->roles->assertNotLastSuperAdmin($user);
+        } catch (ValidationException $e) {
+            return $this->error(
+                collect($e->errors())->flatten()->first() ?: 'Cannot delete the final Super Admin.',
+                422,
+                $e->errors(),
+            );
+        }
+
+        $before = $user->only(['name', 'email', 'status', 'is_active']);
+        $user->update(['is_active' => false, 'status' => 'inactive']);
+        $user->tokens()->delete();
+        $user->roles()->detach();
+        if ($user->staff && $user->staff->status === 'active') {
+            $user->staff->update(['status' => 'inactive']);
+        }
+        $user->delete();
+
+        $activityLogger->log($request, 'user.deleted', 'users', $user, $before, [
+            'deleted' => true,
+            'is_active' => false,
+        ]);
+
+        return $this->success('User deleted. Historical sales remain intact.');
     }
 
     public function effectivePermissions(User $user): JsonResponse

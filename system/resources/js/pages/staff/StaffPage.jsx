@@ -139,6 +139,7 @@ export default function StaffPage() {
                     { key: 'name', label: 'Name', render: (row) => `${row.first_name} ${row.last_name}` },
                     { key: 'phone', label: 'Phone' },
                     { key: 'designation', label: 'Designation', render: (row) => row.designation || '—' },
+                    { key: 'salary', label: 'Salary', render: (row) => Number(row.salary || 0).toLocaleString('en-PK') },
                     { key: 'status', label: 'Status', render: (row) => <StatusBadge status={row.status} /> },
                     {
                         key: 'actions',
@@ -202,7 +203,7 @@ export default function StaffPage() {
             <ConfirmDialog
                 open={Boolean(confirmId)}
                 title="Disable employee?"
-                message="They will lose login access. Historical records stay intact."
+                message="Employment will be marked inactive. Login access is not changed — manage that from User Access."
                 confirmLabel="Disable"
                 busy={busy}
                 onCancel={() => setConfirmId(null)}
