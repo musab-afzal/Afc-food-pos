@@ -27,6 +27,9 @@ const initialState = {
     selectedCustomer: null,
     customerQuery: '',
     customerHits: [],
+    staffMealMode: false,
+    staffId: '',
+    selectedStaff: null,
     discountTotal: 0,
     couponCode: '',
     couponDiscount: 0,
@@ -553,36 +556,42 @@ export function PosProvider({ children }) {
             return false;
         };
 
+        const staffMeal = Boolean(options?.staffMeal || current.staffMealMode);
         if (!current.cart.length) return fail('Cart is empty.');
         if (current.orderType === 'dine_in' && !current.tableId) return fail('Select a table for dine-in.');
-        if (!methods.length) return fail('No payment methods available. Check Settings → Payment methods.');
-        if (deferred && !current.customerId) {
+        if (!staffMeal && !methods.length) return fail('No payment methods available. Check Settings → Payment methods.');
+        if (staffMeal && !current.staffId) {
+            return fail('Select the employee for this staff meal.');
+        }
+        if (deferred && !staffMeal && !current.customerId) {
             return fail('Select or add a customer for unpaid / pay-later (ledger) sales.');
         }
 
         let workingPayments = [...(current.payments || [])];
-        if (!deferred && (!workingPayments.length || workingPayments.some((p) => !Number(p.payment_method_id)))) {
+        if (!staffMeal && !deferred && (!workingPayments.length || workingPayments.some((p) => !Number(p.payment_method_id)))) {
             return fail('Choose a payment method.');
         }
-        if (deferred && (!workingPayments.length || workingPayments.some((p) => !Number(p.payment_method_id)))) {
+        if (!staffMeal && deferred && (!workingPayments.length || workingPayments.some((p) => !Number(p.payment_method_id)))) {
             const fallbackMethod = methods[0];
             if (!fallbackMethod) return fail('Choose a payment method.');
             workingPayments = [{ payment_method_id: Number(fallbackMethod.id), amount: '0', reference: '' }];
         }
 
-        // Unpaid / pending sales are recorded with nothing collected now.
-        const salePayments = deferred
-            ? workingPayments.slice(0, 1).map((payment) => ({ ...payment, amount: '0' }))
-            : workingPayments;
+        // Unpaid / pending sales are recorded with nothing collected now. Staff meals deduct from salary.
+        const salePayments = staffMeal
+            ? []
+            : (deferred
+                ? workingPayments.slice(0, 1).map((payment) => ({ ...payment, amount: '0' }))
+                : workingPayments);
         const paid = salePayments.reduce((sum, payment) => sum + toCents(payment.amount), 0);
-        const missingRef = !deferred && current.payments.find((payment) => {
+        const missingRef = !staffMeal && !deferred && current.payments.find((payment) => {
             const method = methods.find((m) => Number(m.id) === Number(payment.payment_method_id));
             return Boolean(method?.requires_reference) && !String(payment.reference || '').trim();
         });
         if (missingRef) {
             return fail('Enter the payment reference / transaction ID for card or wallet payments.');
         }
-        if (!deferred && (!Number.isFinite(paid) || paid + 1 < due)) {
+        if (!staffMeal && !deferred && (!Number.isFinite(paid) || paid + 1 < due)) {
             return fail(`Payment is short by ${money(Math.max(0, due - (Number.isFinite(paid) ? paid : 0)))}.`);
         }
 
@@ -592,13 +601,15 @@ export function PosProvider({ children }) {
             order_type: current.orderType,
             restaurant_table_id: current.orderType === 'dine_in' ? Number(current.tableId) : null,
             customer_id: current.customerId ? Number(current.customerId) : null,
+            is_staff_meal: staffMeal,
+            staff_id: staffMeal && current.staffId ? Number(current.staffId) : null,
             notes: current.orderNotes || null,
             delivery_name: receiptExtras.deliveryName || null,
             delivery_address: receiptExtras.deliveryAddress || null,
             delivery_phone: receiptExtras.deliveryPhone || null,
             processing_minutes: processingMinutes,
             custom_slip_message: receiptExtras.customSlipMessage || null,
-            payment_status: paymentStatus,
+            payment_status: staffMeal ? 'paid' : paymentStatus,
             was_offline: !current.online,
             discount_total: Number(current.discountTotal) || 0,
             coupon_code: String(current.couponCode || '').trim() || null,

@@ -15,6 +15,8 @@ use App\Models\PaymentMethod;
 use App\Models\Recipe;
 use App\Models\RestaurantTable;
 use App\Models\Sale;
+use App\Models\Staff;
+use App\Models\StaffMeal;
 use App\Models\Tax;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -66,7 +68,12 @@ class PosSaleService
             $dishes = Dish::query()
                 ->whereIn('id', $dishIds)
                 ->where('is_active', true)->where('is_available', true)->where('pos_enabled', true)
-                ->with(['variants.recipe.items.inventoryItem', 'recipe.items.inventoryItem', 'addons'])
+                ->with([
+                    'variants.recipe.items.inventoryItem',
+                    'recipe.items.inventoryItem',
+                    'autoMinusItems',
+                    'addons',
+                ])
                 ->get()->keyBy('id');
 
             if ($dishes->count() !== $dishIds->count()) {
@@ -121,6 +128,7 @@ class PosSaleService
                     $inventoryConsumption,
                     $removedIngredientIds,
                 );
+                $unitCostCents += $this->autoMinusUnitCost($dish, $quantity, $inventoryConsumption);
 
                 $subtotalCents += $grossCents;
                 $itemDiscountCents += $discountCents;
@@ -134,7 +142,11 @@ class PosSaleService
             $requestedDeals = collect($payload['deals'] ?? []);
             $deals = Deal::query()
                 ->whereIn('id', $requestedDeals->pluck('deal_id')->unique())
-                ->with(['items.dish.recipe.items.inventoryItem', 'items.variant.recipe.items.inventoryItem'])
+                ->with([
+                    'items.dish.recipe.items.inventoryItem',
+                    'items.dish.autoMinusItems',
+                    'items.variant.recipe.items.inventoryItem',
+                ])
                 ->get()->keyBy('id');
 
             foreach ($requestedDeals as $index => $requestedDeal) {
@@ -154,6 +166,7 @@ class PosSaleService
                     $unitPriceCents = (int) round($grossCents / $quantity);
                     $lineTaxCents = (int) round($grossCents * ((float) $dish->tax_percent / 100));
                     $unitCostCents = $this->recipeUnitCost($variant?->recipe ?? $dish->recipe, $quantity, $inventoryConsumption);
+                    $unitCostCents += $this->autoMinusUnitCost($dish, $quantity, $inventoryConsumption);
 
                     $subtotalCents += $grossCents;
                     $taxCents += $lineTaxCents;
@@ -217,35 +230,52 @@ class PosSaleService
             [$serviceChargeCents, $deliveryChargeCents] = $this->computeCharges((string) $payload['order_type'], $netBaseCents);
 
             $grandTotalCents = max(0, $netBaseCents + $taxCents + $serviceChargeCents + $deliveryChargeCents);
-            $payments = $payload['payments'] ?? [];
-            $paymentStatus = in_array($payload['payment_status'] ?? null, ['paid', 'unpaid', 'pending'], true)
-                ? $payload['payment_status'] : 'paid';
+            $isStaffMeal = (bool) ($payload['is_staff_meal'] ?? false);
+            $staffId = isset($payload['staff_id']) ? (int) $payload['staff_id'] : null;
+            $staff = null;
+            if ($isStaffMeal) {
+                $staff = Staff::query()->whereKey($staffId)->where('status', 'active')->first();
+                if (! $staff) {
+                    throw ValidationException::withMessages(['staff_id' => ['Select an active employee for staff meal deduction.']]);
+                }
+            }
+
+            $payments = $isStaffMeal ? [] : ($payload['payments'] ?? []);
+            $paymentStatus = $isStaffMeal
+                ? 'paid'
+                : (in_array($payload['payment_status'] ?? null, ['paid', 'unpaid', 'pending'], true)
+                    ? $payload['payment_status'] : 'paid');
             $isDeferredPayment = $paymentStatus !== 'paid';
             $paymentMethodIds = collect($payments)->pluck('payment_method_id')->unique();
             $paymentMethods = PaymentMethod::query()->whereIn('id', $paymentMethodIds)->where('is_active', true)->get()->keyBy('id');
 
-            if ($paymentMethods->count() !== $paymentMethodIds->count()) {
+            if (! $isStaffMeal && $paymentMethods->count() !== $paymentMethodIds->count()) {
                 throw ValidationException::withMessages(['payments' => ['One or more payment methods are unavailable.']]);
             }
 
             $paidCents = 0;
-            foreach ($payments as $index => $payment) {
-                $method = $paymentMethods->get($payment['payment_method_id']);
-                if (($payload['was_offline'] ?? false) && ! $method->works_offline) {
-                    throw ValidationException::withMessages(["payments.$index.payment_method_id" => ['This payment method cannot be used offline.']]);
+            if ($isStaffMeal) {
+                // Deducted from salary — no till tender required.
+                $paidCents = $grandTotalCents;
+            } else {
+                foreach ($payments as $index => $payment) {
+                    $method = $paymentMethods->get($payment['payment_method_id']);
+                    if (($payload['was_offline'] ?? false) && ! $method->works_offline) {
+                        throw ValidationException::withMessages(["payments.$index.payment_method_id" => ['This payment method cannot be used offline.']]);
+                    }
+                    if (! $isDeferredPayment && $method->requires_reference && blank($payment['reference'] ?? null)) {
+                        throw ValidationException::withMessages(["payments.$index.reference" => ['A reference number is required.']]);
+                    }
+                    $paidCents += $this->toCents($payment['amount']);
                 }
-                if (! $isDeferredPayment && $method->requires_reference && blank($payment['reference'] ?? null)) {
-                    throw ValidationException::withMessages(["payments.$index.reference" => ['A reference number is required.']]);
-                }
-                $paidCents += $this->toCents($payment['amount']);
             }
 
             // Unpaid / pending sales may be settled later, so they can be short (or have no payments at all).
-            if (! $isDeferredPayment && $paidCents < $grandTotalCents) {
+            if (! $isDeferredPayment && ! $isStaffMeal && $paidCents < $grandTotalCents) {
                 throw ValidationException::withMessages(['payments' => ['Payment amount is less than the sale total.']]);
             }
 
-            $changeCents = max(0, $paidCents - $grandTotalCents);
+            $changeCents = $isStaffMeal ? 0 : max(0, $paidCents - $grandTotalCents);
             $deliveryName = filled($payload['delivery_name'] ?? null) ? trim((string) $payload['delivery_name']) : null;
             $deliveryAddress = filled($payload['delivery_address'] ?? null) ? trim((string) $payload['delivery_address']) : null;
             $saleNotes = $this->composeSaleNotes($payload['notes'] ?? null, [
@@ -253,6 +283,9 @@ class PosSaleService
                 'custom_slip_message' => filled($payload['custom_slip_message'] ?? null) ? trim((string) $payload['custom_slip_message']) : null,
                 'delivery_name' => $deliveryName,
                 'delivery_phone' => filled($payload['delivery_phone'] ?? null) ? trim((string) $payload['delivery_phone']) : null,
+                'staff_meal' => $isStaffMeal && $staff
+                    ? trim($staff->first_name.' '.$staff->last_name).' ('.$staff->employee_id.')'
+                    : null,
             ]);
 
             $this->consumeInventory($cashier, $inventoryConsumption, $payload['uuid']);
@@ -356,8 +389,27 @@ class PosSaleService
 
             // Record the cash drawer entry straight away (net of change given back) so the open register stays current.
             $cashNetCents = max(0, $cashPaidCents - $changeCents);
-            if ($cashNetCents > 0) {
+            if (! $isStaffMeal && $cashNetCents > 0) {
                 app(CashRegisterService::class)->recordCashSale($cashier, $sale, $this->money($cashNetCents));
+            }
+
+            if ($isStaffMeal && $staff) {
+                $itemSummary = collect($lines)->map(fn (array $line) => [
+                    'name' => $line['dish']->name.($line['variant'] ? ' ('.$line['variant']->name.')' : ''),
+                    'quantity' => $line['quantity'],
+                    'total' => $this->money($line['grossCents'] - $line['discountCents'] + $line['lineTaxCents']),
+                ])->values()->all();
+
+                StaffMeal::query()->create([
+                    'staff_id' => $staff->id,
+                    'sale_id' => $sale->id,
+                    'meal_date' => $now->toDateString(),
+                    'description' => 'POS staff meal · '.$sale->invoice_number,
+                    'items' => $itemSummary,
+                    'amount' => $this->money($grandTotalCents),
+                    'notes' => $payload['notes'] ?? null,
+                    'created_by' => $cashier->id,
+                ]);
             }
 
             if ($kitchenItemIds !== [] && $this->settings->kitchenAutoSendEnabled()
@@ -424,8 +476,9 @@ class PosSaleService
     {
         $customerId = $payload['customer_id'] ?? null;
         $orderType = $payload['order_type'] ?? null;
+        $isStaffMeal = (bool) ($payload['is_staff_meal'] ?? false);
 
-        if ($this->settings->get('pos.require_customer', false) && blank($customerId)) {
+        if (! $isStaffMeal && $this->settings->get('pos.require_customer', false) && blank($customerId)) {
             throw ValidationException::withMessages(['customer_id' => ['A customer is required for POS sales.']]);
         }
 
@@ -549,6 +602,32 @@ class PosSaleService
         }
 
         return trim(($notes ?? '')."\n".Sale::POS_META_MARKER.json_encode($meta, JSON_UNESCAPED_UNICODE));
+    }
+
+    /**
+     * Deduct dish-linked auto-minus stock (e.g. bottles). Returns cost for one sold unit.
+     *
+     * @param  array<int, float>  $inventoryConsumption
+     */
+    private function autoMinusUnitCost(Dish $dish, int $quantity, array &$inventoryConsumption): int
+    {
+        $unitCostCents = 0;
+
+        foreach ($dish->autoMinusItems as $item) {
+            if (! $item->is_active || ! $item->auto_minus) {
+                continue;
+            }
+
+            $perSale = (float) ($item->pivot->quantity ?? 1);
+            if ($perSale <= 0) {
+                continue;
+            }
+
+            $inventoryConsumption[$item->id] = ($inventoryConsumption[$item->id] ?? 0) + ($perSale * $quantity);
+            $unitCostCents += (int) round($perSale * $this->toCents($item->average_cost));
+        }
+
+        return $unitCostCents;
     }
 
     /**

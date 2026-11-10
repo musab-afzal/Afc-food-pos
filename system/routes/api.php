@@ -56,6 +56,7 @@ use App\Http\Controllers\Api\V1\SaleController;
 use App\Http\Controllers\Api\V1\SettingController;
 use App\Http\Controllers\Api\V1\ShiftController;
 use App\Http\Controllers\Api\V1\StaffController;
+use App\Http\Controllers\Api\V1\StaffMealController;
 use App\Http\Controllers\Api\V1\StaffOpsController;
 use App\Http\Controllers\Api\V1\StockAdjustmentController;
 use App\Http\Controllers\Api\V1\StockMovementController;
@@ -211,6 +212,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('permissions/{permission}', [PermissionController::class, 'show'])->whereNumber('permission');
 
             Route::get('user-access', [UserAccessController::class, 'index']);
+            Route::put('users/{user}', [UserAccessController::class, 'update'])->whereNumber('user');
+            Route::delete('users/{user}', [UserAccessController::class, 'destroy'])->whereNumber('user');
             Route::put('users/{user}/role', [UserAccessController::class, 'assignRole'])->whereNumber('user');
             Route::put('users/{user}/status', [UserAccessController::class, 'setStatus'])->whereNumber('user');
             Route::get('users/{user}/effective-permissions', [UserAccessController::class, 'effectivePermissions'])->whereNumber('user');
@@ -240,11 +243,14 @@ Route::prefix('v1')->group(function (): void {
 
         Route::middleware('permission:staff.view')->group(function (): void {
             Route::get('staff', [StaffController::class, 'index']);
+            Route::get('staff/payroll', [StaffMealController::class, 'payroll']);
             Route::get('staff/{staff}', [StaffController::class, 'show']);
         });
         Route::post('staff', [StaffController::class, 'store'])->middleware('permission:staff.create');
         Route::put('staff/{staff}', [StaffController::class, 'update'])->middleware('permission:staff.edit');
         Route::delete('staff/{staff}', [StaffController::class, 'destroy'])->middleware('permission:staff.delete');
+        Route::post('staff-meals', [StaffMealController::class, 'store'])->middleware('permission:staff.edit');
+        Route::delete('staff-meals/{staffMeal}', [StaffMealController::class, 'destroy'])->middleware('permission:staff.edit')->whereNumber('staffMeal');
 
         // Staff operations: shifts, attendance, leaves
         Route::middleware('permission:staff.view')->group(function (): void {

@@ -1,4 +1,4 @@
-﻿import { Banknote, ChevronRight, CircleX, Clock, CreditCard, HandPlatter, Hourglass, Loader2, Plus, Printer, QrCode, ReceiptText, RotateCcw, Tag, Trash2, Wallet, X } from 'lucide-react';
+﻿import { Banknote, ChevronRight, CircleX, Clock, CreditCard, HandPlatter, Hourglass, Loader2, Plus, Printer, QrCode, ReceiptText, RotateCcw, Tag, Trash2, Users, Wallet, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePos } from '../context/PosContext.jsx';
 import { money, toCents } from '../utils/cart.js';
@@ -29,6 +29,9 @@ export default function PaymentModal() {
     const primary = methods.find((method) => Number(method.id) === Number(state.payments[0]?.payment_method_id));
     const isCash = primary?.code === 'cash' || (String(primary?.name || '').toLowerCase().includes('cash') && !String(primary?.name || '').toLowerCase().includes('jazz'));
     const hasCustomer = Boolean(state.customerId || state.selectedCustomer?.id);
+    const staffList = state.catalog?.staff || [];
+    const staffMealMode = Boolean(state.staffMealMode);
+    const selectedStaff = state.selectedStaff || staffList.find((row) => String(row.id) === String(state.staffId)) || null;
 
     const quickAmounts = useMemo(() => {
         const amount = due / 100;
@@ -176,11 +179,52 @@ export default function PaymentModal() {
                         </div>
                     </aside>
                 </div>
-                <div className="afc-checkout-deferred" role="group" aria-label="Pay later / ledger options">
-                    <span>Pay later (ledger)</span>
+                <div className="afc-checkout-deferred" role="group" aria-label="Staff meal and pay later options">
+                    <span>Staff meal / pay later</span>
+                    <label className="afc-checkout-staff-meal" style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 180 }}>
+                        <span style={{ fontSize: 12, opacity: 0.75 }}>Deduct from employee salary</span>
+                        <select
+                            disabled={busy}
+                            value={state.staffId || ''}
+                            onChange={(event) => {
+                                const staff = staffList.find((row) => String(row.id) === event.target.value) || null;
+                                patch({
+                                    staffId: event.target.value,
+                                    selectedStaff: staff,
+                                    staffMealMode: Boolean(event.target.value),
+                                    checkoutError: '',
+                                });
+                            }}
+                        >
+                            <option value="">Normal payment…</option>
+                            {staffList.map((row) => (
+                                <option key={row.id} value={row.id}>
+                                    {row.first_name} {row.last_name} ({row.employee_id})
+                                </option>
+                            ))}
+                        </select>
+                    </label>
                     <button
                         type="button"
-                        disabled={busy || !methods.length}
+                        disabled={busy || !staffMealMode || !state.staffId}
+                        title={staffMealMode ? 'Complete and deduct from salary' : 'Select an employee first'}
+                        onClick={async () => {
+                            if (!state.staffId) {
+                                patch({ checkoutError: 'Select the employee eating this meal.' });
+                                return;
+                            }
+                            setLocalBusy(true);
+                            patch({ checkoutError: '', staffMealMode: true, paymentStatus: 'paid' });
+                            try { await completeSale({ paymentStatus: 'paid', staffMeal: true }); }
+                            catch (error) { patch({ checkoutError: error?.message || 'Unable to record staff meal.' }); }
+                            finally { setLocalBusy(false); }
+                        }}
+                    >
+                        <Users size={20} /> Staff meal
+                    </button>
+                    <button
+                        type="button"
+                        disabled={busy || staffMealMode || !methods.length}
                         title={hasCustomer ? 'Save as unpaid on customer ledger' : 'Select or add a customer first'}
                         onClick={() => {
                             if (!hasCustomer) {
@@ -194,7 +238,7 @@ export default function PaymentModal() {
                     </button>
                     <button
                         type="button"
-                        disabled={busy || !methods.length}
+                        disabled={busy || staffMealMode || !methods.length}
                         title={hasCustomer ? 'Save as pending on customer ledger' : 'Select or add a customer first'}
                         onClick={() => {
                             if (!hasCustomer) {
@@ -207,7 +251,33 @@ export default function PaymentModal() {
                         <Hourglass size={20} /> Pending payment
                     </button>
                 </div>
-                <footer className="afc-checkout-footer"><button type="button" disabled={busy} className="afc-checkout-cancel" onClick={close}><CircleX size={28} /> Cancel</button><button type="button" disabled={busy || !methods.length || !state.payments.length} className="afc-checkout-complete" onClick={() => handleComplete('paid')}>{busy ? <Loader2 size={30} className="animate-spin" /> : <Printer size={32} />}{busy ? 'Processing...' : 'Complete & Print'}</button></footer>
+                {staffMealMode && selectedStaff && (
+                    <p style={{ margin: '0 20px 12px', fontSize: 13 }}>
+                        Will deduct <strong>{money(due)}</strong> from <strong>{selectedStaff.first_name} {selectedStaff.last_name}</strong> salary.
+                    </p>
+                )}
+                <footer className="afc-checkout-footer">
+                    <button type="button" disabled={busy} className="afc-checkout-cancel" onClick={close}><CircleX size={28} /> Cancel</button>
+                    <button
+                        type="button"
+                        disabled={busy || (staffMealMode ? !state.staffId : (!methods.length || !state.payments.length))}
+                        className="afc-checkout-complete"
+                        onClick={() => {
+                            if (staffMealMode) {
+                                setLocalBusy(true);
+                                patch({ checkoutError: '' });
+                                completeSale({ paymentStatus: 'paid', staffMeal: true })
+                                    .catch((error) => patch({ checkoutError: error?.message || 'Unable to record staff meal.' }))
+                                    .finally(() => setLocalBusy(false));
+                                return;
+                            }
+                            handleComplete('paid');
+                        }}
+                    >
+                        {busy ? <Loader2 size={30} className="animate-spin" /> : <Printer size={32} />}
+                        {busy ? 'Processing...' : (staffMealMode ? 'Deduct & Print' : 'Complete & Print')}
+                    </button>
+                </footer>
             </section>
         </div>
     );

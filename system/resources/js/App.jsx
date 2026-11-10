@@ -41,6 +41,7 @@ import BackupPage from './pages/admin/BackupPage.jsx';
 import BulkDataPage from './pages/admin/BulkDataPage.jsx';
 import ShiftsPage from './pages/staff/ShiftsPage.jsx';
 import StaffPage from './pages/staff/StaffPage.jsx';
+import StaffPayrollPage from './pages/staff/StaffPayrollPage.jsx';
 import DeliveriesPage from './pages/delivery/DeliveriesPage.jsx';
 import RidersPage from './pages/delivery/RidersPage.jsx';
 import SettlementsPage from './pages/delivery/SettlementsPage.jsx';
@@ -187,6 +188,7 @@ export default function App() {
                     <Route path="/customers/:id" element={<ProtectedRoute permission="customers.view"><CustomerDetailPage /></ProtectedRoute>} />
 
                     <Route path="/staff" element={<ProtectedRoute permission="staff.view"><StaffPage /></ProtectedRoute>} />
+                    <Route path="/staff/payroll" element={<ProtectedRoute permission="staff.view"><StaffPayrollPage /></ProtectedRoute>} />
                     <Route path="/staff/shifts" element={<ProtectedRoute permission="staff.view"><ShiftsPage /></ProtectedRoute>} />
                     <Route path="/staff/attendance" element={<ProtectedRoute permission="attendance.view"><AttendancePage /></ProtectedRoute>} />
                     <Route path="/staff/leaves" element={<ProtectedRoute permission="attendance.view"><LeavesPage /></ProtectedRoute>} />

@@ -27,5 +27,10 @@ export const roleApi = {
         method: 'PUT',
         body: JSON.stringify({ status }),
     }),
+    updateUser: (userId, body) => api(`/admin/users/${userId}`, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+    }),
+    deleteUser: (userId) => api(`/admin/users/${userId}`, { method: 'DELETE' }),
     effectivePermissions: (userId) => api(`/admin/users/${userId}/effective-permissions`),
 };

@@ -47,6 +47,17 @@ class UpsertDishRequest extends FormRequest
             'pos_enabled' => ['required', 'boolean'],
             'kitchen_enabled' => ['required', 'boolean'],
             'sort_order' => ['required', 'integer', 'min:0', 'max:10000'],
+            'auto_minus_items' => ['sometimes', 'array'],
+            'auto_minus_items.*.inventory_item_id' => [
+                'required',
+                'integer',
+                'distinct',
+                Rule::exists('inventory_items', 'id')->where(fn ($query) => $query
+                    ->where('auto_minus', true)
+                    ->where('is_active', true)
+                    ->whereNull('deleted_at')),
+            ],
+            'auto_minus_items.*.quantity' => ['required', 'numeric', 'gt:0', 'max:999999'],
         ];
     }
 }

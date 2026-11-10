@@ -7,6 +7,7 @@ export function emptyOrderDraft() {
         deliveryName: '', deliveryAddress: '', deliveryPhone: '',
         processingMinutes: '', customSlipMessage: '', paymentStatus: 'paid',
         holdId: null, selectedPaymentMethod: '',
+        staffMealMode: false, staffId: '', selectedStaff: null,
     };
 }
 

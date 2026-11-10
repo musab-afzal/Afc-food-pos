@@ -46,6 +46,7 @@ class UpsertInventoryItemRequest extends FormRequest
             'average_cost' => ['nullable', 'numeric', 'min:0'],
             'latest_purchase_cost' => ['nullable', 'numeric', 'min:0'],
             'is_active' => ['required', 'boolean'],
+            'auto_minus' => ['sometimes', 'boolean'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ];
     }

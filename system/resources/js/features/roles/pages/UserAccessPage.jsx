@@ -1,6 +1,7 @@
 import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import ConfirmDialog from '../../../components/ConfirmDialog.jsx';
 import DataTable from '../../../components/DataTable.jsx';
 import FormModal from '../../../components/FormModal.jsx';
 import PageHeader from '../../../components/PageHeader.jsx';
@@ -24,6 +25,15 @@ const emptyUserForm = {
     password: '',
 };
 
+const emptyEditForm = {
+    name: '',
+    email: '',
+    phone: '',
+    password: '',
+    role_id: '',
+    status: 'active',
+};
+
 export default function UserAccessPage() {
     const { refreshUser, user: authUser } = useAuth();
     const [rows, setRows] = useState([]);
@@ -39,6 +49,9 @@ export default function UserAccessPage() {
     const [addOpen, setAddOpen] = useState(false);
     const [addForm, setAddForm] = useState(emptyUserForm);
     const [addBusy, setAddBusy] = useState(false);
+    const [editTarget, setEditTarget] = useState(null);
+    const [editForm, setEditForm] = useState(emptyEditForm);
+    const [deleteTarget, setDeleteTarget] = useState(null);
 
     async function load() {
         setLoading(true);
@@ -69,6 +82,78 @@ export default function UserAccessPage() {
     function openAssign(row) {
         setAssignTarget(row);
         setNewRoleId(String(row.role?.id || ''));
+    }
+
+    function openEdit(row) {
+        setEditTarget(row);
+        setEditForm({
+            name: row.name || '',
+            email: row.email || '',
+            phone: row.phone || '',
+            password: '',
+            role_id: String(row.role?.id || ''),
+            status: row.status || (row.is_active ? 'active' : 'inactive'),
+        });
+    }
+
+    async function saveEdit(event) {
+        event.preventDefault();
+        if (!editTarget) return;
+        if (!editForm.name.trim() || !editForm.email.trim()) {
+            toast.error('Name and email are required.');
+            return;
+        }
+        if (editForm.password && editForm.password.length < 8) {
+            toast.error('Password must be at least 8 characters.');
+            return;
+        }
+
+        const role = roles.find((r) => String(r.id) === String(editForm.role_id));
+        if (role?.slug === 'super_admin') {
+            const ok = window.confirm('You are granting unrestricted system access to this user. Continue?');
+            if (!ok) return;
+        }
+
+        setBusy(true);
+        try {
+            const body = {
+                name: editForm.name.trim(),
+                email: editForm.email.trim(),
+                phone: editForm.phone || null,
+                status: editForm.status,
+            };
+            if (editForm.password) body.password = editForm.password;
+            if (editForm.role_id) {
+                body.role_id = Number(editForm.role_id);
+                body.confirm_super_admin = role?.slug === 'super_admin';
+            }
+            await roleApi.updateUser(editTarget.id, body);
+            toast.success('User updated');
+            setEditTarget(null);
+            await load();
+            if (authUser?.id === editTarget.id) {
+                await refreshUser();
+            }
+        } catch (error) {
+            toast.error(error.message);
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    async function confirmDelete() {
+        if (!deleteTarget) return;
+        setBusy(true);
+        try {
+            await roleApi.deleteUser(deleteTarget.id);
+            toast.success('User deleted');
+            setDeleteTarget(null);
+            await load();
+        } catch (error) {
+            toast.error(error.message);
+        } finally {
+            setBusy(false);
+        }
     }
 
     async function saveRole(event) {
@@ -191,7 +276,7 @@ export default function UserAccessPage() {
         <div>
             <PageHeader
                 title="User Access"
-                description="Create users, assign roles, activate/deactivate accounts, and review permissions."
+                description="Create, edit, or delete users; assign roles; activate/deactivate login."
                 breadcrumbs={['System Administration', 'User Access']}
                 actions={(
                     <button type="button" onClick={openAddUser} className="flex items-center gap-2 btn-primary">
@@ -247,6 +332,9 @@ export default function UserAccessPage() {
                             const isSelf = authUser?.id === row.id;
                             return (
                                 <div className="flex flex-wrap justify-end gap-2">
+                                    <button type="button" className="rounded-lg px-2 py-1.5 text-xs font-medium hover:bg-ink/5" onClick={() => openEdit(row)}>
+                                        Edit
+                                    </button>
                                     <button
                                         type="button"
                                         disabled={busy || (isSelf && isActive)}
@@ -260,7 +348,16 @@ export default function UserAccessPage() {
                                         Change Role
                                     </button>
                                     <button type="button" className="rounded-lg px-2 py-1.5 text-xs font-medium hover:bg-ink/5" onClick={() => viewEffective(row)}>
-                                        Effective Permissions
+                                        Permissions
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={busy || isSelf}
+                                        className="rounded-lg px-2 py-1.5 text-xs font-semibold text-coral hover:bg-coral/5 disabled:opacity-40"
+                                        onClick={() => setDeleteTarget(row)}
+                                        title={isSelf ? 'You cannot delete your own account' : undefined}
+                                    >
+                                        Delete
                                     </button>
                                 </div>
                             );
@@ -333,6 +430,58 @@ export default function UserAccessPage() {
             </FormModal>
 
             <FormModal
+                open={Boolean(editTarget)}
+                title="Edit User"
+                description="Update login details, role, or status."
+                onClose={() => setEditTarget(null)}
+                onSubmit={saveEdit}
+                busy={busy}
+                submitLabel="Save changes"
+                wide
+            >
+                <div className="grid gap-4 sm:grid-cols-2">
+                    <label className="block text-sm sm:col-span-2">
+                        <span className="mb-2 block font-medium">Full name *</span>
+                        <input className="field" required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
+                    </label>
+                    <label className="block text-sm">
+                        <span className="mb-2 block font-medium">Email *</span>
+                        <input className="field" type="email" required value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} />
+                    </label>
+                    <label className="block text-sm">
+                        <span className="mb-2 block font-medium">Phone</span>
+                        <input className="field" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} />
+                    </label>
+                    <label className="block text-sm">
+                        <span className="mb-2 block font-medium">Role</span>
+                        <select className="field" value={editForm.role_id} onChange={(e) => setEditForm({ ...editForm, role_id: e.target.value })}>
+                            <option value="">Keep current</option>
+                            {roles.filter((r) => r.is_active).map((role) => (
+                                <option key={role.id} value={role.id}>{role.name}</option>
+                            ))}
+                        </select>
+                    </label>
+                    <label className="block text-sm">
+                        <span className="mb-2 block font-medium">Login status</span>
+                        <select
+                            className="field"
+                            value={editForm.status}
+                            disabled={authUser?.id === editTarget?.id}
+                            onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                        >
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                            <option value="suspended">Suspended</option>
+                        </select>
+                    </label>
+                    <label className="block text-sm sm:col-span-2">
+                        <span className="mb-2 block font-medium">New password (optional)</span>
+                        <input className="field" type="password" minLength={8} value={editForm.password} onChange={(e) => setEditForm({ ...editForm, password: e.target.value })} placeholder="Leave blank to keep current password" />
+                    </label>
+                </div>
+            </FormModal>
+
+            <FormModal
                 open={Boolean(assignTarget)}
                 title="Change Role"
                 onClose={() => setAssignTarget(null)}
@@ -354,6 +503,16 @@ export default function UserAccessPage() {
                     </label>
                 </div>
             </FormModal>
+
+            <ConfirmDialog
+                open={Boolean(deleteTarget)}
+                title="Delete user?"
+                message={`${deleteTarget?.name || 'This user'} will lose login access. Sales history stays intact.`}
+                confirmLabel="Delete user"
+                busy={busy}
+                onCancel={() => setDeleteTarget(null)}
+                onConfirm={confirmDelete}
+            />
 
             {effective && (
                 <div className="fixed inset-0 z-50 grid place-items-center bg-ink/40 p-4">

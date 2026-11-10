@@ -17,7 +17,7 @@ import { currency } from '../../utils/format.js';
 const emptyForm = {
     inventory_category_id: '', name: '', sku: '', barcode: '', unit: 'pc',
     current_stock: 0, minimum_stock: 0, reorder_level: 0, average_cost: 0,
-    latest_purchase_cost: 0, is_active: true, notes: '',
+    latest_purchase_cost: 0, is_active: true, auto_minus: false, notes: '',
 };
 
 export default function IngredientsPage({ stockOnly = false, defaultFilter = '' }) {
@@ -58,6 +58,7 @@ export default function IngredientsPage({ stockOnly = false, defaultFilter = '' 
             average_cost: row.average_cost,
             latest_purchase_cost: row.latest_purchase_cost,
             is_active: row.is_active,
+            auto_minus: Boolean(row.auto_minus),
             notes: row.notes || '',
         } : emptyForm);
         setOpen(true);
@@ -101,11 +102,13 @@ export default function IngredientsPage({ stockOnly = false, defaultFilter = '' 
         <div>
             <PageHeader
                 title={stockOnly ? 'Stock' : 'Ingredients'}
-                description={stockOnly ? 'Current on-hand quantities and reorder signals.' : 'Raw materials tracked for recipe deduction and purchasing.'}
+                description={stockOnly
+                    ? 'On-hand quantities. Enable Auto minus so linked dishes deduct stock on POS sales.'
+                    : 'Raw materials tracked for recipe / auto-minus deduction and purchasing.'}
                 breadcrumbs={['Inventory', stockOnly ? 'Stock' : 'Ingredients']}
-                actions={!stockOnly && can('inventory.create') && (
+                actions={can('inventory.create') && (
                     <button type="button" onClick={() => openForm()} className="flex items-center gap-2 btn-primary">
-                        <Plus size={16} /> Add ingredient
+                        <Plus size={16} /> {stockOnly ? 'Add stock item' : 'Add ingredient'}
                     </button>
                 )}
             />
@@ -139,6 +142,13 @@ export default function IngredientsPage({ stockOnly = false, defaultFilter = '' 
                     { key: 'reorder_level', label: 'Reorder', render: (row) => Number(row.reorder_level) },
                     { key: 'average_cost', label: 'Avg cost', render: (row) => currency(row.average_cost) },
                     {
+                        key: 'auto_minus',
+                        label: 'Auto minus',
+                        render: (row) => (row.auto_minus
+                            ? <StatusBadge status="active" label="Yes" />
+                            : <span className="text-ink/35">—</span>),
+                    },
+                    {
                         key: 'status',
                         label: 'Status',
                         render: (row) => {
@@ -161,7 +171,7 @@ export default function IngredientsPage({ stockOnly = false, defaultFilter = '' 
                 ]}
             />
             <Pagination meta={meta} onPage={(page) => setFilters((f) => ({ ...f, page }))} />
-            <FormModal open={open} title={editing ? 'Edit ingredient' : 'Add ingredient'} onClose={() => setOpen(false)} onSubmit={submit} busy={busy} wide>
+            <FormModal open={open} title={editing ? (stockOnly ? 'Edit stock item' : 'Edit ingredient') : (stockOnly ? 'Add stock item' : 'Add ingredient')} onClose={() => setOpen(false)} onSubmit={submit} busy={busy} wide>
                 <div className="grid gap-4 sm:grid-cols-2">
                     <Field label="Name"><input className="field" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
                     <Field label="SKU"><input className="field" required value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} /></Field>
@@ -173,6 +183,13 @@ export default function IngredientsPage({ stockOnly = false, defaultFilter = '' 
                     </Field>
                     <Field label="Unit"><input className="field" required value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} /></Field>
                     <Field label="Barcode"><input className="field" value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} /></Field>
+                    <label className="flex items-start gap-3 rounded-xl border border-herb/30 bg-herb/5 p-3 text-sm sm:col-span-2">
+                        <input type="checkbox" className="mt-1 size-4 accent-herb" checked={form.auto_minus} onChange={(e) => setForm({ ...form, auto_minus: e.target.checked })} />
+                        <span>
+                            <span className="font-semibold text-heading">Auto minus on POS sale</span>
+                            <span className="mt-0.5 block text-xs text-ink/55">Turn this on for bottles / pack items. Then link them on a dish so each POS sale deducts stock automatically.</span>
+                        </span>
+                    </label>
                     {!editing && <Field label="Opening stock"><input className="field" type="number" step="any" min="0" value={form.current_stock} onChange={(e) => setForm({ ...form, current_stock: e.target.value })} /></Field>}
                     <Field label="Minimum stock"><input className="field" type="number" step="any" min="0" value={form.minimum_stock} onChange={(e) => setForm({ ...form, minimum_stock: e.target.value })} /></Field>
                     <Field label="Reorder level"><input className="field" type="number" step="any" min="0" value={form.reorder_level} onChange={(e) => setForm({ ...form, reorder_level: e.target.value })} /></Field>

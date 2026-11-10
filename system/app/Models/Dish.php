@@ -48,6 +48,14 @@ class Dish extends Model
         return $this->hasOne(Recipe::class)->whereNull('dish_variant_id');
     }
 
+    /** Stock items marked auto-minus that deduct on each POS sale of this dish. */
+    public function autoMinusItems(): BelongsToMany
+    {
+        return $this->belongsToMany(InventoryItem::class, 'dish_auto_minus_items')
+            ->withPivot('quantity')
+            ->withTimestamps();
+    }
+
     /** Public URL for the dish image (root-relative so it works across local hosts/ports). */
     public function imageUrl(): ?string
     {

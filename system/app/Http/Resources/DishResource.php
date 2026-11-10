@@ -42,6 +42,16 @@ class DishResource extends JsonResource
             'variants' => $this->whenLoaded('variants'),
             'addons' => $this->whenLoaded('addons'),
             'modifier_groups' => $this->whenLoaded('modifierGroups'),
+            'auto_minus_items' => $this->when(
+                $this->relationLoaded('autoMinusItems'),
+                fn () => $this->autoMinusItems->map(fn ($item) => [
+                    'inventory_item_id' => $item->id,
+                    'name' => $item->name,
+                    'sku' => $item->sku,
+                    'unit' => $item->unit,
+                    'quantity' => (float) ($item->pivot->quantity ?? 1),
+                ])->values()->all()
+            ),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

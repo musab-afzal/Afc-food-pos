@@ -24,9 +24,12 @@ class StorePosSaleRequest extends FormRequest
     {
         // Unpaid / pending sales may carry no payments (or zero-amount ones) and are settled later.
         $deferred = in_array($this->input('payment_status'), ['unpaid', 'pending'], true);
+        $staffMeal = $this->boolean('is_staff_meal');
 
         return [
             'payment_status' => ['nullable', 'in:paid,unpaid,pending'],
+            'is_staff_meal' => ['sometimes', 'boolean'],
+            'staff_id' => [$staffMeal ? 'required' : 'nullable', 'integer', 'exists:staff,id'],
             'delivery_name' => ['nullable', 'string', 'max:150'],
             'delivery_address' => ['nullable', 'string', 'max:1000'],
             'delivery_phone' => ['nullable', 'string', 'max:30'],
@@ -36,7 +39,7 @@ class StorePosSaleRequest extends FormRequest
             'order_type' => ['required', 'in:dine_in,takeaway,delivery'],
             'restaurant_table_id' => ['nullable', 'required_if:order_type,dine_in', 'exists:restaurant_tables,id'],
             'customer_id' => [
-                $deferred ? 'required' : 'nullable',
+                ($deferred && ! $staffMeal) ? 'required' : 'nullable',
                 'exists:customers,id',
             ],
             'notes' => ['nullable', 'string', 'max:2000'],
@@ -61,11 +64,11 @@ class StorePosSaleRequest extends FormRequest
             'items.*.addon_ids.*' => ['integer', 'distinct', 'exists:addons,id'],
             'items.*.removed_ingredient_ids' => ['sometimes', 'array'],
             'items.*.removed_ingredient_ids.*' => ['integer', 'distinct', 'exists:inventory_items,id'],
-            'payments' => $deferred
-                ? ['required_unless:payment_status,unpaid,pending', 'nullable', 'array']
-                : ['required_unless:payment_status,unpaid,pending', 'array', 'min:1'],
+            'payments' => ($deferred || $staffMeal)
+                ? ['nullable', 'array']
+                : ['required', 'array', 'min:1'],
             'payments.*.payment_method_id' => ['required', 'integer', 'exists:payment_methods,id'],
-            'payments.*.amount' => $deferred ? ['required', 'numeric', 'min:0'] : ['required', 'numeric', 'gt:0'],
+            'payments.*.amount' => ($deferred || $staffMeal) ? ['required', 'numeric', 'min:0'] : ['required', 'numeric', 'gt:0'],
             'payments.*.reference' => ['nullable', 'string', 'max:150'],
         ];
     }

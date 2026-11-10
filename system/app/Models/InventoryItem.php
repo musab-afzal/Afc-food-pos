@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['inventory_category_id', 'brand_id', 'preferred_supplier_id', 'name', 'sku', 'barcode', 'unit', 'current_stock', 'minimum_stock', 'reorder_level', 'average_cost', 'latest_purchase_cost', 'is_active', 'notes'])]
+#[Fillable(['inventory_category_id', 'brand_id', 'preferred_supplier_id', 'name', 'sku', 'barcode', 'unit', 'current_stock', 'minimum_stock', 'reorder_level', 'average_cost', 'latest_purchase_cost', 'is_active', 'auto_minus', 'notes'])]
 class InventoryItem extends Model
 {
     /** @use HasFactory<InventoryItemFactory> */
@@ -45,6 +45,7 @@ class InventoryItem extends Model
             'average_cost' => 'decimal:4',
             'latest_purchase_cost' => 'decimal:4',
             'is_active' => 'boolean',
+            'auto_minus' => 'boolean',
         ];
     }
 }

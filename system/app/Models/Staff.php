@@ -39,6 +39,11 @@ class Staff extends Model
         return $this->hasMany(Leave::class);
     }
 
+    public function meals(): HasMany
+    {
+        return $this->hasMany(StaffMeal::class);
+    }
+
     protected function casts(): array
     {
         return [

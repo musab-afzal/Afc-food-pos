@@ -31,7 +31,10 @@ class DishController extends Controller
         $sort = $request->string('sort')->value() ?: 'sort_order';
         $direction = $request->string('direction')->value() ?: 'asc';
         $dishes = Dish::query()
-            ->with('category:id,name,slug')
+            ->with([
+                'category:id,name,slug',
+                'autoMinusItems:id,name,sku,unit,auto_minus,is_active',
+            ])
             ->when($request->filled('search'), fn ($query) => $query->where(function ($nested) use ($request): void {
                 $search = '%'.$request->string('search')->value().'%';
                 $nested->where('name', 'like', $search)->orWhere('sku', 'like', $search)->orWhere('barcode', 'like', $search);
@@ -50,13 +53,19 @@ class DishController extends Controller
     public function store(UpsertDishRequest $request, ActivityLogger $activityLogger): JsonResponse
     {
         $dish = DB::transaction(function () use ($request, $activityLogger): Dish {
-            $dish = Dish::query()->create($request->validated());
+            $data = $request->safe()->except(['auto_minus_items']);
+            $dish = Dish::query()->create($data);
+            $this->syncAutoMinusItems($dish, $request->input('auto_minus_items', []));
             $activityLogger->log($request, 'dish.created', 'menu', $dish, after: $dish->toArray());
 
             return $dish;
         });
 
-        return response()->json(['success' => true, 'message' => 'Dish created.', 'data' => new DishResource($dish->load('category'))], 201);
+        return response()->json([
+            'success' => true,
+            'message' => 'Dish created.',
+            'data' => new DishResource($dish->load(['category', 'autoMinusItems:id,name,sku,unit,auto_minus,is_active'])),
+        ], 201);
     }
 
     public function show(Dish $dish): JsonResponse
@@ -68,6 +77,7 @@ class DishController extends Controller
                 'variants' => fn ($query) => $query->orderBy('sort_order'),
                 'addons',
                 'modifierGroups.modifiers',
+                'autoMinusItems:id,name,sku,unit,auto_minus,is_active',
             ])),
         ]);
     }
@@ -76,11 +86,34 @@ class DishController extends Controller
     {
         $before = $dish->toArray();
         DB::transaction(function () use ($request, $dish, $activityLogger, $before): void {
-            $dish->update($request->validated());
+            $dish->update($request->safe()->except(['auto_minus_items']));
+            if ($request->exists('auto_minus_items')) {
+                $this->syncAutoMinusItems($dish, $request->input('auto_minus_items', []));
+            }
             $activityLogger->log($request, 'dish.updated', 'menu', $dish, $before, $dish->fresh()->toArray());
         });
 
-        return response()->json(['success' => true, 'message' => 'Dish updated.', 'data' => new DishResource($dish->fresh()->load('category'))]);
+        return response()->json([
+            'success' => true,
+            'message' => 'Dish updated.',
+            'data' => new DishResource($dish->fresh()->load(['category', 'autoMinusItems:id,name,sku,unit,auto_minus,is_active'])),
+        ]);
+    }
+
+    /**
+     * @param  list<array{inventory_item_id: int|string, quantity: float|int|string}>  $items
+     */
+    private function syncAutoMinusItems(Dish $dish, array $items): void
+    {
+        $sync = [];
+        foreach ($items as $row) {
+            $id = (int) ($row['inventory_item_id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            $sync[$id] = ['quantity' => (float) ($row['quantity'] ?? 1)];
+        }
+        $dish->autoMinusItems()->sync($sync);
     }
 
     public function destroy(Request $request, Dish $dish, ActivityLogger $activityLogger): JsonResponse

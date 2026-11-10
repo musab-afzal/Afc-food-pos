@@ -24,6 +24,7 @@ class InventoryItemController extends Controller
             'inventory_category_id' => ['nullable', 'integer', 'exists:inventory_categories,id'],
             'stock_status' => ['nullable', Rule::in(['low', 'out'])],
             'is_active' => ['nullable', 'boolean'],
+            'auto_minus' => ['nullable', 'boolean'],
             'sort' => ['nullable', 'in:name,sku,current_stock,average_cost,created_at'],
             'direction' => ['nullable', 'in:asc,desc'],
             'per_page' => ['nullable', 'integer', 'min:5', 'max:100'],
@@ -47,6 +48,7 @@ class InventoryItemController extends Controller
             ->when($stockStatus === 'low', fn ($query) => $query->whereColumn('current_stock', '<=', 'reorder_level'))
             ->when($stockStatus === 'out', fn ($query) => $query->where('current_stock', '<=', 0))
             ->when($request->has('is_active'), fn ($query) => $query->where('is_active', $request->boolean('is_active')))
+            ->when($request->has('auto_minus'), fn ($query) => $query->where('auto_minus', $request->boolean('auto_minus')))
             ->orderBy($sort, $direction)
             ->orderBy('id')
             ->paginate($request->integer('per_page', 15))

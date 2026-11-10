@@ -12,6 +12,7 @@ use App\Models\Dish;
 use App\Models\PaymentMethod;
 use App\Models\RestaurantTable;
 use App\Models\Sale;
+use App\Models\Staff;
 use App\Models\Tax;
 use App\Services\DealService;
 use App\Services\PosSaleService;
@@ -41,6 +42,11 @@ class PosController extends Controller
                 ->orderBy('name')
                 ->get(['id', 'name', 'price', 'cost', 'is_active']),
             'payment_methods' => PaymentMethod::query()->where('is_active', true)->orderBy('sort_order')->get(),
+            'staff' => Staff::query()
+                ->where('status', 'active')
+                ->orderBy('first_name')
+                ->orderBy('last_name')
+                ->get(['id', 'employee_id', 'first_name', 'last_name', 'designation', 'salary']),
             'tables' => RestaurantTable::query()
                 ->where('is_active', true)
                 ->with('area:id,name')

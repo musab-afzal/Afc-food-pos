@@ -171,6 +171,7 @@ export const navigation = [
                 permission: 'staff.view',
                 children: [
                     { to: '/staff', label: 'Employees' },
+                    { to: '/staff/payroll', label: 'Payroll / Meals' },
                     { to: '/staff/shifts', label: 'Shifts' },
                     { to: '/staff/attendance', label: 'Attendance', permission: 'attendance.view' },
                     { to: '/staff/leaves', label: 'Leaves', permission: 'attendance.view' },

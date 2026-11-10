@@ -16,7 +16,7 @@ function dishImageSrc(dish) {
     return mediaUrl(dish?.image_url || dish?.image || '');
 }
 
-const defaults = { category_id: '', brand_id: null, name: '', slug: '', sku: '', barcode: '', description: '', short_description: '', image: '', base_price: '', tax_percent: 0, preparation_minutes: 10, is_active: true, is_available: true, dine_in_enabled: true, takeaway_enabled: true, delivery_enabled: true, qr_enabled: true, pos_enabled: true, kitchen_enabled: true, sort_order: 0, variants: [] };
+const defaults = { category_id: '', brand_id: null, name: '', slug: '', sku: '', barcode: '', description: '', short_description: '', image: '', base_price: '', tax_percent: 0, preparation_minutes: 10, is_active: true, is_available: true, dine_in_enabled: true, takeaway_enabled: true, delivery_enabled: true, qr_enabled: true, pos_enabled: true, kitchen_enabled: true, sort_order: 0, variants: [], auto_minus_items: [] };
 const emptyVariant = { id: null, name: '', sku: '', price: '' };
 const slugify = (value) => value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const currency = (value) => new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', maximumFractionDigits: 0 }).format(Number(value || 0));
@@ -26,6 +26,7 @@ export default function DishesPage() {
     const [filters, setFilters] = useState({ search: '', category_id: '', is_active: '', date_from: '', date_to: '', page: 1, per_page: 15 });
     const { rows, meta, loading, error, reload } = usePaginatedResource('/dishes', filters);
     const [categories, setCategories] = useState([]);
+    const [autoMinusOptions, setAutoMinusOptions] = useState([]);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editing, setEditing] = useState(null);
     const [form, setForm] = useState(defaults);
@@ -37,11 +38,34 @@ export default function DishesPage() {
     const [variantsLoading, setVariantsLoading] = useState(false);
     const [imagePreview, setImagePreview] = useState('');
     const [uploadingImage, setUploadingImage] = useState(false);
+    const [pickAutoMinusId, setPickAutoMinusId] = useState('');
 
-    useEffect(() => { api('/categories?per_page=100&is_active=1').then((response) => setCategories(response.data)); }, []);
+    useEffect(() => {
+        api('/categories?per_page=100&is_active=1').then((response) => setCategories(response.data));
+        api('/inventory/items?auto_minus=1&is_active=1&per_page=100')
+            .then((response) => setAutoMinusOptions(response.data || []))
+            .catch(() => setAutoMinusOptions([]));
+    }, []);
     function openForm(dish = null) {
-        setEditing(dish); setRemovedVariantIds([]);
-        setForm(dish ? { ...defaults, ...dish, category_id: dish.category_id, brand_id: dish.brand_id || null, description: dish.description || '', short_description: dish.short_description || '', image: dish.image || '', barcode: dish.barcode || '', variants: [] } : defaults);
+        setEditing(dish); setRemovedVariantIds([]); setPickAutoMinusId('');
+        const linked = (dish?.auto_minus_items || []).map((item) => ({
+            inventory_item_id: String(item.inventory_item_id || item.id),
+            name: item.name || '',
+            unit: item.unit || '',
+            quantity: item.quantity ?? 1,
+        }));
+        setForm(dish ? {
+            ...defaults,
+            ...dish,
+            category_id: dish.category_id,
+            brand_id: dish.brand_id || null,
+            description: dish.description || '',
+            short_description: dish.short_description || '',
+            image: dish.image || '',
+            barcode: dish.barcode || '',
+            variants: [],
+            auto_minus_items: linked,
+        } : defaults);
         setImagePreview(dishImageSrc(dish));
         setFormErrors({}); setIsFormOpen(true);
         if (dish) {
@@ -54,6 +78,35 @@ export default function DishesPage() {
                 .catch(() => {})
                 .finally(() => setVariantsLoading(false));
         }
+    }
+    function addAutoMinusItem() {
+        if (!pickAutoMinusId) return;
+        if (form.auto_minus_items.some((row) => String(row.inventory_item_id) === String(pickAutoMinusId))) {
+            setPickAutoMinusId('');
+            return;
+        }
+        const option = autoMinusOptions.find((row) => String(row.id) === String(pickAutoMinusId));
+        if (!option) return;
+        setForm((current) => ({
+            ...current,
+            auto_minus_items: [
+                ...current.auto_minus_items,
+                { inventory_item_id: String(option.id), name: option.name, unit: option.unit, quantity: 1 },
+            ],
+        }));
+        setPickAutoMinusId('');
+    }
+    function updateAutoMinusQty(index, quantity) {
+        setForm((current) => ({
+            ...current,
+            auto_minus_items: current.auto_minus_items.map((row, i) => (i === index ? { ...row, quantity } : row)),
+        }));
+    }
+    function removeAutoMinusItem(index) {
+        setForm((current) => ({
+            ...current,
+            auto_minus_items: current.auto_minus_items.filter((_, i) => i !== index),
+        }));
     }
     function addVariant() { setForm((current) => ({ ...current, variants: [...current.variants, { ...emptyVariant }] })); }
     function updateVariant(index, patch) {
@@ -114,8 +167,25 @@ export default function DishesPage() {
     async function submit(event) {
         event.preventDefault(); setBusy(true); setFormErrors({});
         try {
-            const { variants: _variants, ...dishFields } = form;
-            const response = await api(editing ? `/dishes/${editing.id}` : '/dishes', { method: editing ? 'PUT' : 'POST', body: JSON.stringify({ ...dishFields, category_id: Number(form.category_id), brand_id: form.brand_id || null, base_price: Number(form.base_price), tax_percent: Number(form.tax_percent), preparation_minutes: Number(form.preparation_minutes), sort_order: Number(form.sort_order), barcode: form.barcode || null, image: form.image || null }) });
+            const { variants: _variants, auto_minus_items: autoMinusRows, ...dishFields } = form;
+            const response = await api(editing ? `/dishes/${editing.id}` : '/dishes', {
+                method: editing ? 'PUT' : 'POST',
+                body: JSON.stringify({
+                    ...dishFields,
+                    category_id: Number(form.category_id),
+                    brand_id: form.brand_id || null,
+                    base_price: Number(form.base_price),
+                    tax_percent: Number(form.tax_percent),
+                    preparation_minutes: Number(form.preparation_minutes),
+                    sort_order: Number(form.sort_order),
+                    barcode: form.barcode || null,
+                    image: form.image || null,
+                    auto_minus_items: (autoMinusRows || []).map((row) => ({
+                        inventory_item_id: Number(row.inventory_item_id),
+                        quantity: Number(row.quantity) || 1,
+                    })),
+                }),
+            });
             const dishId = response.data?.id ?? editing?.id;
             const failures = dishId && (form.variants.length || removedVariantIds.length) ? await syncVariants(dishId, form.sku) : [];
             setNotice(failures.length ? `${response.message} Some variations were not saved — ${failures.join('; ')}` : response.message);
@@ -282,6 +352,59 @@ export default function DishesPage() {
                                 </label>
                             ))}
                         </div>
+                    </div>
+                    <div className="rounded-[5px] border border-herb/25 bg-herb/5 p-4">
+                        <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-herb">Auto minus stock</p>
+                        <p className="mb-3 text-xs text-muted">Link stock items that should deduct when this dish is sold on POS (e.g. 1 bottle).</p>
+                        <div className="mb-3 flex flex-wrap gap-2">
+                            <select className="field min-w-[220px] flex-1 bg-white" value={pickAutoMinusId} onChange={(event) => setPickAutoMinusId(event.target.value)}>
+                                <option value="">Select auto-minus stock item…</option>
+                                {autoMinusOptions
+                                    .filter((option) => !form.auto_minus_items.some((row) => String(row.inventory_item_id) === String(option.id)))
+                                    .map((option) => (
+                                        <option key={option.id} value={option.id}>
+                                            {option.name} ({option.unit}) · stock {Number(option.current_stock)}
+                                        </option>
+                                    ))}
+                            </select>
+                            <button type="button" onClick={addAutoMinusItem} disabled={!pickAutoMinusId} className="inline-flex items-center gap-1 rounded-[5px] bg-white px-3 py-2 text-xs font-bold text-primary shadow-sm hover:bg-primary-soft disabled:opacity-40">
+                                <Plus size={14} /> Link item
+                            </button>
+                        </div>
+                        {!autoMinusOptions.length && (
+                            <p className="mb-2 rounded-[5px] border border-dashed border-ink/15 bg-white p-3 text-xs text-muted">
+                                Dropdown is empty until you mark a stock item with <strong>Auto minus on POS sale</strong> under Inventory → Stock / Ingredients.
+                            </p>
+                        )}
+                        {!form.auto_minus_items.length ? (
+                            <p className="rounded-[5px] bg-white/70 p-3 text-xs text-muted">No items linked yet for this dish.</p>
+                        ) : (
+                            <div className="space-y-2">
+                                {form.auto_minus_items.map((row, index) => (
+                                    <div key={row.inventory_item_id} className="grid gap-2 rounded-[5px] bg-white p-3 sm:grid-cols-[1.5fr_0.7fr_auto]">
+                                        <div>
+                                            <p className="text-sm font-semibold">{row.name || `Item #${row.inventory_item_id}`}</p>
+                                            <p className="text-xs text-muted">{row.unit || 'unit'} deducted per sale</p>
+                                        </div>
+                                        <label className="text-xs font-medium">
+                                            Qty per sale
+                                            <input
+                                                className="field mt-1"
+                                                type="number"
+                                                min="0.0001"
+                                                step="any"
+                                                value={row.quantity}
+                                                onChange={(event) => updateAutoMinusQty(index, event.target.value)}
+                                            />
+                                        </label>
+                                        <button type="button" onClick={() => removeAutoMinusItem(index)} className="inline-flex items-center justify-center gap-1 rounded-[5px] px-2.5 py-1.5 text-xs font-bold text-coral hover:bg-coral/5">
+                                            <Trash2 size={14} /> Remove
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        {formErrors.auto_minus_items && <span className="mt-2 block text-xs text-coral">{formErrors.auto_minus_items[0]}</span>}
                     </div>
                     <div>
                         <div className="mb-3 flex items-center justify-between">
