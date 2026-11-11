@@ -1,11 +1,11 @@
 @import 'tailwindcss';
-@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap');
+/* System / bundled fonts only — Google Fonts break the app when offline. */
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 
 @theme {
-    --font-sans: 'Nunito', ui-sans-serif, system-ui, sans-serif;
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
 
     /* Design system from sites design */
     --color-primary: #FE9F43;
@@ -34,7 +34,7 @@
         min-height: 100vh;
         color: #646B72;
         background: #F7F7F7;
-        font-family: 'Nunito', ui-sans-serif, system-ui, sans-serif;
+        font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
         font-size: 14px;
         line-height: 1.5;
     }
