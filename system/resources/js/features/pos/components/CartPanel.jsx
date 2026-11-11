@@ -2,6 +2,7 @@ import { Banknote, ChevronRight, CreditCard, GitFork, Minus, Pause, Plus, Printe
 
 import { usePos } from '../context/PosContext.jsx';
 import { cartItemLabel, money } from '../utils/cart.js';
+import { availablePaymentMethods } from '../utils/payments.js';
 
 function paymentIcon(method) {
     const name = `${method.code} ${method.name}`.toLowerCase();
@@ -14,7 +15,7 @@ function paymentIcon(method) {
 export default function CartPanel() {
     const { state, patch, totals, can, changeQuantity, removeItem, editItem, openPayment, holdOrder, clearCart } = usePos();
     const allowDiscounts = state.catalog?.settings?.allow_discounts !== false;
-    const methods = (state.catalog?.payment_methods || []).filter((method) => state.online || method.works_offline);
+    const methods = availablePaymentMethods(state.catalog?.payment_methods || [], state.online);
     const selectedMethod = methods.find((method) => Number(method.id) === Number(state.selectedPaymentMethod)) || methods.find((method) => method.code === 'cash') || methods[0];
     const discount = totals.discountCents + totals.loyaltyDiscountCents;
     const selectedTable = state.catalog?.tables?.find((table) => String(table.id) === String(state.tableId));

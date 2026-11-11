@@ -19,8 +19,13 @@ export default function SuccessModal() {
                 <span className="mx-auto grid size-14 place-items-center rounded-full bg-herb/10 text-herb">
                     <CheckCircle2 size={28} />
                 </span>
-                <h2 className="mt-4 text-2xl font-semibold">Order completed</h2>
+                <h2 className="mt-4 text-2xl font-semibold">{sale.offline ? 'Saved offline' : 'Order completed'}</h2>
                 <p className="mt-1 text-sm text-ink/45">{sale.invoice}</p>
+                {sale.offline && (
+                    <p className="mt-2 text-sm text-amber-700">
+                        This sale is stored on this device and will merge automatically when internet returns.
+                    </p>
+                )}
                 <p className="mt-4 text-3xl font-semibold text-herb">{money(toCents(sale.total))}</p>
                 {Number(sale.change) > 0 && <p className="mt-1 text-sm text-ink/50">Change {money(toCents(sale.change))}</p>}
                 <div className="mt-6 grid gap-2">

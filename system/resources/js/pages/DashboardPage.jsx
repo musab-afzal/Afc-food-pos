@@ -5,9 +5,9 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-    Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart as RePieChart, ReferenceLine,
-    ResponsiveContainer, Tooltip, XAxis, YAxis,
+    Cell, Pie, PieChart as RePieChart, ResponsiveContainer, Tooltip,
 } from 'recharts';
+import LineTrendChart from '../components/charts/LineTrendChart.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../services/api.js';
@@ -195,19 +195,16 @@ export default function DashboardPage() {
                                 <h4 className="text-lg font-extrabold text-heading">{currency(chartTotals.sales)}</h4>
                             </div>
                         </div>
-                        <div className="h-72">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={chartData} barGap={4}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E6EAED" />
-                                    <XAxis dataKey="label" tick={{ fill: '#646B72', fontSize: 12 }} axisLine={false} tickLine={false} />
-                                    <YAxis tick={{ fill: '#646B72', fontSize: 12 }} axisLine={false} tickLine={false} />
-                                    <Tooltip formatter={(value) => currency(value)} contentStyle={{ borderRadius: 8, borderColor: '#E6EAED' }} />
-                                    <Legend />
-                                    <Bar dataKey="purchase" name="Purchase" fill="#FEC78B" radius={[4, 4, 0, 0]} />
-                                    <Bar dataKey="sales" name="Sales" fill="#FE9F43" radius={[4, 4, 0, 0]} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
+                        <LineTrendChart
+                            data={chartData}
+                            xKey="label"
+                            height={288}
+                            formatter={(value) => currency(value)}
+                            series={[
+                                { key: 'purchase', name: 'Purchase', color: '#FEC78B' },
+                                { key: 'sales', name: 'Sales', color: '#FE9F43' },
+                            ]}
+                        />
                     </div>
                 </article>
 
@@ -374,22 +371,20 @@ export default function DashboardPage() {
                                 <p className="text-xs text-muted">Expense</p>
                             </div>
                         </div>
-                        <div className="h-72">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={salesStats.months || []}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E6EAED" />
-                                    <XAxis dataKey="label" tick={{ fill: '#646B72', fontSize: 12 }} axisLine={false} tickLine={false} />
-                                    <YAxis tick={{ fill: '#646B72', fontSize: 12 }} axisLine={false} tickLine={false} />
-                                    <Tooltip
-                                        formatter={(value, name) => [currency(Math.abs(Number(value || 0))), name === 'expense' ? 'Expense' : 'Revenue']}
-                                        contentStyle={{ borderRadius: 8, borderColor: '#E6EAED' }}
-                                    />
-                                    <ReferenceLine y={0} stroke="#D3D5D7" />
-                                    <Bar dataKey="revenue" name="Revenue" fill="#0E9384" radius={[4, 4, 0, 0]} />
-                                    <Bar dataKey="expense" name="Expense" fill="#FE9F43" radius={[0, 0, 4, 4]} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
+                        <LineTrendChart
+                            data={(salesStats.months || []).map((row) => ({
+                                ...row,
+                                expense: Math.abs(Number(row.expense || 0)),
+                                revenue: Number(row.revenue || 0),
+                            }))}
+                            xKey="label"
+                            height={288}
+                            formatter={(value, name) => [currency(Math.abs(Number(value || 0))), name]}
+                            series={[
+                                { key: 'revenue', name: 'Revenue', color: '#0E9384' },
+                                { key: 'expense', name: 'Expense', color: '#FE9F43' },
+                            ]}
+                        />
                     </div>
                 </article>
 

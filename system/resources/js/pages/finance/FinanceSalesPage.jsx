@@ -4,6 +4,7 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
+import LineTrendChart from '../../components/charts/LineTrendChart.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
 import StatusBadge from '../../components/StatusBadge.jsx';
 import KpiCard from '../../components/ui/KpiCard.jsx';
@@ -163,18 +164,16 @@ export default function FinanceSalesPage() {
                     <section className="mt-5 grid gap-5 xl:grid-cols-3">
                         <article className="card-panel p-5 xl:col-span-2">
                             <h3 className="mb-4 text-base font-semibold">Sales trend</h3>
-                            <div className="h-72">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={dailyChart}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E6EAED" />
-                                        <XAxis dataKey="label" tick={{ fill: '#646B72', fontSize: 12 }} axisLine={false} tickLine={false} />
-                                        <YAxis tick={{ fill: '#646B72', fontSize: 12 }} axisLine={false} tickLine={false} />
-                                        <Tooltip formatter={(value, name) => (name === 'tickets' ? [value, 'Tickets'] : [currency(value), 'Sales'])} contentStyle={{ borderRadius: 8, borderColor: '#E6EAED' }} />
-                                        <Legend />
-                                        <Bar dataKey="sales" name="Sales" fill="#0E9384" radius={[4, 4, 0, 0]} />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
+                            <LineTrendChart
+                                data={dailyChart}
+                                xKey="label"
+                                height={288}
+                                formatter={(value, name) => (name === 'Tickets' ? [value, 'Tickets'] : [currency(value), name])}
+                                series={[
+                                    { key: 'sales', name: 'Sales', color: '#0E9384' },
+                                    { key: 'tickets', name: 'Tickets', color: '#3B82F6' },
+                                ]}
+                            />
                         </article>
 
                         <article className="card-panel p-5">

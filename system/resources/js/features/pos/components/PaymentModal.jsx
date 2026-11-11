@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePos } from '../context/PosContext.jsx';
 import { money, toCents } from '../utils/cart.js';
+import { availablePaymentMethods } from '../utils/payments.js';
 
 function MethodIcon({ method }) {
     const name = `${method?.code} ${method?.name}`.toLowerCase();
@@ -17,7 +18,7 @@ export default function PaymentModal() {
     const { state, patch, totals, completeSale } = usePos();
     const [localBusy, setLocalBusy] = useState(false);
     const dialogRef = useRef(null);
-    const methods = (state.catalog?.payment_methods || []).filter((method) => state.online || method.works_offline);
+    const methods = availablePaymentMethods(state.catalog?.payment_methods || [], state.online);
     const allowDiscounts = state.catalog?.settings?.allow_discounts !== false;
     const discountCents = (totals.discountCents || 0) + (totals.loyaltyDiscountCents || 0);
     const paid = state.payments.reduce((sum, payment) => sum + toCents(payment.amount), 0);
@@ -150,7 +151,7 @@ export default function PaymentModal() {
                             <legend>Select Payment Method</legend>
                             <div>{methods.map((method) => <button type="button" key={method.id} aria-pressed={!split && method.id === primary?.id} className={!split && method.id === primary?.id ? 'is-active' : ''} onClick={() => selectMethod(method)}><MethodIcon method={method} /><span>{method.name}</span></button>)}</div>
                         </fieldset>
-                        {!methods.length && <p role="alert" className="afc-checkout-error">No payment methods available{state.online ? '. Configure a payment method to continue.' : ' offline. Reconnect to continue.'}</p>}
+                        {!methods.length && <p role="alert" className="afc-checkout-error">No payment methods available{state.online ? '. Configure a payment method to continue.' : ' offline. Enable “Works offline” on Cash in Settings → Payment methods.'}</p>}
                         {!split && isCash && <div className="afc-checkout-quick">
                             <button type="button" disabled={busy} onClick={() => setPayment(0, { amount: (due / 100).toFixed(2) })}>Exact</button>
                             {quickAmounts.map((amount) => <button type="button" key={amount} disabled={busy} onClick={() => setPayment(0, { amount: amount.toFixed(2) })}>Rs {amount.toLocaleString('en-PK')}</button>)}
@@ -224,9 +225,13 @@ export default function PaymentModal() {
                     </button>
                     <button
                         type="button"
-                        disabled={busy || staffMealMode || !methods.length}
-                        title={hasCustomer ? 'Save as unpaid on customer ledger' : 'Select or add a customer first'}
+                        disabled={busy || staffMealMode || !methods.length || !state.online}
+                        title={!state.online ? 'Needs internet' : (hasCustomer ? 'Save as unpaid on customer ledger' : 'Select or add a customer first')}
                         onClick={() => {
+                            if (!state.online) {
+                                patch({ checkoutError: 'Pay-later / unpaid sales need an internet connection.' });
+                                return;
+                            }
                             if (!hasCustomer) {
                                 patch({ checkoutError: 'Add a customer before marking unpaid — it posts to their ledger.' });
                                 return;
@@ -238,9 +243,13 @@ export default function PaymentModal() {
                     </button>
                     <button
                         type="button"
-                        disabled={busy || staffMealMode || !methods.length}
-                        title={hasCustomer ? 'Save as pending on customer ledger' : 'Select or add a customer first'}
+                        disabled={busy || staffMealMode || !methods.length || !state.online}
+                        title={!state.online ? 'Needs internet' : (hasCustomer ? 'Save as pending on customer ledger' : 'Select or add a customer first')}
                         onClick={() => {
+                            if (!state.online) {
+                                patch({ checkoutError: 'Pay-later / unpaid sales need an internet connection.' });
+                                return;
+                            }
                             if (!hasCustomer) {
                                 patch({ checkoutError: 'Add a customer before pending payment — it posts to their ledger.' });
                                 return;

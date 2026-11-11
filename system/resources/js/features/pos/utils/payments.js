@@ -1,3 +1,17 @@
+/** Methods usable while offline (flag or cash by code/name). */
+export function offlineCapableMethods(methods = []) {
+    return (methods || []).filter((method) => {
+        if (method?.works_offline) return true;
+        const code = String(method?.code || '').toLowerCase();
+        const name = String(method?.name || '').toLowerCase();
+        return code === 'cash' || (name.includes('cash') && !name.includes('jazz'));
+    });
+}
+
+export function availablePaymentMethods(methods = [], online = true) {
+    return online ? (methods || []) : offlineCapableMethods(methods);
+}
+
 export function buildInitialPayments(methods, selectedId, totalCents, split = false) {
     const primary = methods.find((method) => Number(method.id) === Number(selectedId))
         || methods.find((method) => method.code === 'cash')

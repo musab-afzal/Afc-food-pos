@@ -260,7 +260,9 @@ class PosSaleService
             } else {
                 foreach ($payments as $index => $payment) {
                     $method = $paymentMethods->get($payment['payment_method_id']);
-                    if (($payload['was_offline'] ?? false) && ! $method->works_offline) {
+                    $cashOffline = strtolower((string) $method->code) === 'cash'
+                        || (str_contains(strtolower((string) $method->name), 'cash') && ! str_contains(strtolower((string) $method->name), 'jazz'));
+                    if (($payload['was_offline'] ?? false) && ! $method->works_offline && ! $cashOffline) {
                         throw ValidationException::withMessages(["payments.$index.payment_method_id" => ['This payment method cannot be used offline.']]);
                     }
                     if (! $isDeferredPayment && $method->requires_reference && blank($payment['reference'] ?? null)) {

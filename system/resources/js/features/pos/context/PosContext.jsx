@@ -1,12 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef } from 'react';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { cacheCatalog, getCachedCatalog, markSync, pendingQueue, saveOfflineSale } from '../../../services/database.js';
-import { syncPending } from '../../../services/sync.js';
+import { startAutoSync, syncPending } from '../../../services/sync.js';
 import { api } from '../../../services/api.js';
 import { setCurrencyConfig } from '../../../utils/format.js';
 import { printReceiptDocument } from '../../../utils/receiptTemplate.js';
 import { posApi } from '../services/posApi.js';
-import { buildInitialPayments } from '../utils/payments.js';
+import { availablePaymentMethods, buildInitialPayments } from '../utils/payments.js';
 import { activeOrderKey, reduceOrderDrafts, restoreOrderDrafts, serializeOrderDrafts } from '../utils/orderDrafts.js';
 import {
     buildCartItem, buildDealCartItem, cartItemLabel, cartPayloadFromState, computeTotals, dealPayload, lineKey, money, restoreCartItems, restoreDealItems, toCents,
@@ -243,23 +243,6 @@ export function PosProvider({ children }) {
     }, [loadCatalog, loadHolds, loadRegister]);
 
     useEffect(() => {
-        const onOnline = () => {
-            patch({ online: true });
-            syncPending((updater) => {
-                if (typeof updater === 'function') {
-                    patch({ sync: updater({ state: 'idle', pending: 0 }) });
-                } else if (updater && typeof updater === 'object') {
-                    patch({ sync: updater });
-                }
-            });
-        };
-        const onOffline = () => patch({ online: false });
-        window.addEventListener('online', onOnline);
-        window.addEventListener('offline', onOffline);
-        return () => { window.removeEventListener('online', onOnline); window.removeEventListener('offline', onOffline); };
-    }, [patch]);
-
-    useEffect(() => {
         let cancelled = false;
         if (!state.customerQuery || state.customerQuery.length < 2 || !state.online) {
             patch({ customerHits: [] });
@@ -274,6 +257,46 @@ export function PosProvider({ children }) {
     }, [state.customerQuery, state.online, state.orderType, state.tableId, patch]);
 
     const notify = useCallback((notice, noticeTone = 'info') => patch({ notice, noticeTone }), [patch]);
+
+    useEffect(() => {
+        const applySyncProgress = (progress) => {
+            if (!progress || typeof progress !== 'object') return;
+            patch({
+                sync: {
+                    state: progress.state || 'idle',
+                    pending: Number(progress.pending || 0),
+                    lastSync: progress.lastSync || stateRef.current.sync?.lastSync || null,
+                },
+            });
+            if (progress.state === 'synced' && Number(progress.synced || 0) > 0) {
+                notify(`${progress.synced} offline sale(s) synced to server.`, 'success');
+                loadCatalog();
+            }
+        };
+
+        const onOnline = () => {
+            patch({ online: true });
+            notify('Back online — syncing offline sales…', 'info');
+            syncPending(applySyncProgress).catch(() => {});
+            loadCatalog();
+            loadHolds();
+            loadRegister();
+        };
+        const onOffline = () => {
+            patch({ online: false });
+            notify('You are offline. Sales will be saved on this device and sync later.', 'warning');
+        };
+
+        window.addEventListener('online', onOnline);
+        window.addEventListener('offline', onOffline);
+        const stopAutoSync = startAutoSync(applySyncProgress, 20000);
+
+        return () => {
+            window.removeEventListener('online', onOnline);
+            window.removeEventListener('offline', onOffline);
+            stopAutoSync();
+        };
+    }, [patch, notify, loadCatalog, loadHolds, loadRegister]);
 
     const addOrMergeItem = useCallback((item) => {
         patch({
@@ -509,7 +532,7 @@ export function PosProvider({ children }) {
             patch({ orderDetailsOpen: true });
             return;
         }
-        const methods = (state.catalog?.payment_methods || []).filter((method) => state.online || method.works_offline);
+        const methods = availablePaymentMethods(state.catalog?.payment_methods || [], state.online);
         const payments = buildInitialPayments(methods, state.selectedPaymentMethod, totals.total, options.split);
         if (!payments.length) {
             notify('No payment methods are available for this connection.', 'error');
@@ -532,7 +555,8 @@ export function PosProvider({ children }) {
 
         const current = stateRef.current;
         const currentTotals = totalsRef.current || { total: 0 };
-        const methods = (current.catalog?.payment_methods || []).filter((m) => current.online || m.works_offline);
+        const onlineNow = Boolean(current.online && navigator.onLine);
+        const methods = availablePaymentMethods(current.catalog?.payment_methods || [], onlineNow);
         const requestedStatus = options?.paymentStatus ?? current.paymentStatus;
         const paymentStatus = PAYMENT_STATUSES.includes(requestedStatus) ? requestedStatus : 'paid';
         const deferred = paymentStatus !== 'paid';
@@ -559,12 +583,19 @@ export function PosProvider({ children }) {
         const staffMeal = Boolean(options?.staffMeal || current.staffMealMode);
         if (!current.cart.length) return fail('Cart is empty.');
         if (current.orderType === 'dine_in' && !current.tableId) return fail('Select a table for dine-in.');
-        if (!staffMeal && !methods.length) return fail('No payment methods available. Check Settings → Payment methods.');
+        if (!staffMeal && !methods.length) {
+            return fail(onlineNow
+                ? 'No payment methods available. Check Settings → Payment methods.'
+                : 'No offline payment method. Enable “Works offline” on Cash in Settings → Payment methods.');
+        }
         if (staffMeal && !current.staffId) {
             return fail('Select the employee for this staff meal.');
         }
         if (deferred && !staffMeal && !current.customerId) {
             return fail('Select or add a customer for unpaid / pay-later (ledger) sales.');
+        }
+        if (!onlineNow && deferred) {
+            return fail('Pay-later / unpaid sales need an internet connection.');
         }
 
         let workingPayments = [...(current.payments || [])];
@@ -596,6 +627,7 @@ export function PosProvider({ children }) {
         }
 
         const cartSnapshot = [...current.cart];
+        // Coupons / loyalty need the server — strip them while offline so sync won't fail later.
         const payload = {
             uuid: makeUuid(),
             order_type: current.orderType,
@@ -610,10 +642,10 @@ export function PosProvider({ children }) {
             processing_minutes: processingMinutes,
             custom_slip_message: receiptExtras.customSlipMessage || null,
             payment_status: staffMeal ? 'paid' : paymentStatus,
-            was_offline: !current.online,
+            was_offline: !onlineNow,
             discount_total: Number(current.discountTotal) || 0,
-            coupon_code: String(current.couponCode || '').trim() || null,
-            loyalty_points: Number(current.loyaltyPoints) || 0,
+            coupon_code: onlineNow ? (String(current.couponCode || '').trim() || null) : null,
+            loyalty_points: onlineNow ? (Number(current.loyaltyPoints) || 0) : 0,
             deals: dealPayload(current.cart),
             items: current.cart.filter((item) => !item.isDeal).map((item) => ({
                 dish_id: item.dish.id,
@@ -633,53 +665,33 @@ export function PosProvider({ children }) {
         payingLockRef.current = true;
         patch({ paying: true, checkoutError: '' });
 
-        try {
-            try {
-                await saveOfflineSale(payload);
-            } catch (offlineError) {
-                console.warn('Offline save failed', offlineError);
-            }
+        const offlineReceipt = () => ({
+            ...payload,
+            items: cartSnapshot,
+            invoice_number: `OFF-${String(payload.uuid).slice(0, 8).toUpperCase()}`,
+            grand_total: (due / 100).toFixed(2),
+            change_total: (Math.max(0, paid - due) / 100).toFixed(2),
+            sold_at: new Date().toISOString(),
+        });
 
-            let receipt = {
-                ...payload,
-                items: cartSnapshot,
-                invoice_number: `OFF-${String(payload.uuid).slice(0, 8).toUpperCase()}`,
-                grand_total: (due / 100).toFixed(2),
-                change_total: (Math.max(0, paid - due) / 100).toFixed(2),
-                sold_at: new Date().toISOString(),
-            };
-
-            if (current.online) {
-                const response = await posApi.createSale(payload);
-                if (!response?.data) {
-                    throw new Error('Sale API returned an empty response.');
-                }
-                receipt = response.data;
-                try { await markSync(payload.uuid, 'synced'); } catch { /* ignore */ }
-                if (current.holdId) {
-                    try { await posApi.deleteHold(current.holdId); } catch { /* ignore */ }
-                    loadHolds();
-                }
-            }
-
+        const finishLocalSale = async (receipt, wasOffline) => {
             let pending = 0;
             try {
-                const queue = await pendingQueue();
-                pending = queue.length;
+                pending = (await pendingQueue()).length;
             } catch { /* ignore */ }
 
             payingLockRef.current = false;
-            patch({ sync: { state: 'idle', pending }, paying: false, paymentOpen: false, checkoutError: '' });
+            patch({ sync: { state: wasOffline ? 'pending' : 'idle', pending }, paying: false, paymentOpen: false, checkoutError: '' });
 
             const shouldPrint = current.catalog?.settings?.auto_print !== false;
             if (shouldPrint) {
                 try {
                     let printSource = receipt;
-                    if (current.online && receipt?.id) {
+                    if (!wasOffline && receipt?.id) {
                         try {
                             const full = await apiSaleReceipt(receipt.id);
                             if (full?.data) printSource = full.data;
-                        } catch { /* fall back to sale payload */ }
+                        } catch { /* fall back */ }
                     }
                     printPosReceipt(printSource, cartSnapshot, user, current.catalog?.settings, receiptExtras);
                 } catch (printError) {
@@ -692,23 +704,94 @@ export function PosProvider({ children }) {
                     invoice: receipt.invoice_number,
                     total: receipt.grand_total,
                     change: receipt.change_total,
-                    saleId: receipt.id,
-                    offline: !current.online,
+                    saleId: receipt.id || null,
+                    offline: wasOffline,
                 },
             });
             dispatch({ type: 'reset_cart', orderKey: activeOrderKey(current) });
-            loadCatalog();
+            if (!wasOffline) loadCatalog();
+            if (wasOffline) {
+                notify('Sale saved offline. It will sync automatically when internet returns.', 'success');
+            }
             return true;
+        };
+
+        const isNetworkFailure = (error) => {
+            const status = Number(error?.status);
+            if (!status) return true; // fetch/TypeError / offline
+            return status >= 500 || status === 408 || status === 429;
+        };
+
+        try {
+            if (onlineNow) {
+                try {
+                    const response = await posApi.createSale(payload);
+                    if (!response?.data) {
+                        throw new Error('Sale API returned an empty response.');
+                    }
+                    // Mirror locally as synced so a later reconnect does not re-post.
+                    try {
+                        await saveOfflineSale(payload);
+                        await markSync(payload.uuid, 'synced');
+                    } catch { /* ignore local mirror */ }
+                    if (current.holdId) {
+                        try { await posApi.deleteHold(current.holdId); } catch { /* ignore */ }
+                        loadHolds();
+                    }
+                    return finishLocalSale(response.data, false);
+                } catch (apiError) {
+                    if (!isNetworkFailure(apiError)) {
+                        throw apiError; // validation / auth — do not queue
+                    }
+                    // Connection dropped mid-sale — save on device and treat as success.
+                    console.warn('Online sale failed; queuing offline', apiError);
+                    payload.was_offline = true;
+                    await saveOfflineSale(payload);
+                    patch({ online: false });
+                    return finishLocalSale(offlineReceipt(), true);
+                }
+            }
+
+            await saveOfflineSale(payload);
+            return finishLocalSale(offlineReceipt(), true);
         } catch (error) {
             console.error('POS checkout failed', error);
-            try { await markSync(payload.uuid, 'failed', error.message); } catch { /* ignore */ }
             payingLockRef.current = false;
-            const message = error?.message || 'Sale could not be completed.';
+            const message = error?.message || 'Sale could not be saved on this device.';
             patch({ paying: false, checkoutError: message });
             notify(`Sale not completed: ${message}`, 'error');
             return false;
         }
     }, [user, patch, notify, loadHolds, loadCatalog]);
+
+    const syncNow = useCallback(async () => {
+        if (!navigator.onLine) {
+            notify('Still offline — reconnect to sync sales.', 'warning');
+            return;
+        }
+        const applySyncProgress = (progress) => {
+            if (!progress || typeof progress !== 'object') return;
+            patch({
+                sync: {
+                    state: progress.state || 'idle',
+                    pending: Number(progress.pending || 0),
+                    lastSync: progress.lastSync || stateRef.current.sync?.lastSync || null,
+                },
+            });
+            if (progress.state === 'synced' && Number(progress.synced || 0) > 0) {
+                notify(`${progress.synced} offline sale(s) synced to server.`, 'success');
+                loadCatalog();
+            } else if (progress.state === 'failed' && Number(progress.failed || 0) > 0) {
+                notify(`${progress.failed} sale(s) could not sync. Will retry automatically.`, 'error');
+            } else if (Number(progress.pending || 0) === 0 && Number(progress.synced || 0) === 0) {
+                notify('All sales are already synced.', 'info');
+            }
+        };
+        notify('Syncing offline sales…', 'info');
+        await syncPending(applySyncProgress).catch(() => {
+            notify('Sync failed. Will retry when connection is stable.', 'error');
+        });
+    }, [patch, notify, loadCatalog]);
 
     const loadRecent = useCallback(async () => {
         patch({ recentOpen: true, recentLoading: true });
@@ -757,7 +840,7 @@ export function PosProvider({ children }) {
         state, patch, totals, filteredDishes, filteredDeals, filteredAddons, catalogAddons, categoryCounts, user, can, logout, searchRef,
         loadCatalog, loadHolds, notify, chooseDish, chooseDeal, handleBarcodeEnter, saveCustomized, addVariantLines,
         changeQuantity, removeItem, addAddonToLastItem, editItem, applyCoupon, holdOrder, resumeHold, deleteHold,
-        openPayment, completeSale, loadRecent, createCustomer, clearCart, printReceipt: printPosReceipt,
+        openPayment, completeSale, syncNow, loadRecent, createCustomer, clearCart, printReceipt: printPosReceipt,
         lineKey, money, toCents, cartItemLabel,
     };
 

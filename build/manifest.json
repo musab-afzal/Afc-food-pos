@@ -32,7 +32,7 @@
     "src": "_instrument-sans-600-normal-B9e8oLYv.woff"
   },
   "resources/css/app.css": {
-    "file": "assets/app-P99q7zje.css",
+    "file": "assets/app-CdISAi-2.css",
     "name": "app",
     "names": [
       "app.css"
@@ -41,12 +41,12 @@
     "isEntry": true
   },
   "resources/js/main.jsx": {
-    "file": "assets/main-B9sPAsC5.js",
+    "file": "assets/main-DIuVY-lc.js",
     "name": "main",
     "src": "resources/js/main.jsx",
     "isEntry": true,
     "css": [
-      "assets/main-a3cwJ9tN.css"
+      "assets/main-D_toYXcC.css"
     ],
     "assets": [
       "assets/aaleshan-restaurant-BKn97TBo.jpg"

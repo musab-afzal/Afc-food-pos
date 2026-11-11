@@ -48,8 +48,19 @@
 .afc-pos-order-details-notes { grid-template-columns: 1fr auto; }
 .afc-pos-register { display: flex; align-items: center; gap: 12px; border-left: 1px solid var(--pos-border); padding-left: 17px; white-space: nowrap; }
 .afc-pos-register > svg { color: #ff8a00; }
+.afc-pos-register.is-offline > svg { color: #b45309; }
 .afc-pos-register strong, .afc-pos-user strong { display: block; font-size: 14px; font-weight: 750; }
 .afc-pos-register small, .afc-pos-user small { display: block; margin-top: 1px; font-size: 12px; color: #536887; }
+.afc-pos-sync-pill {
+    display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0;
+    padding: 8px 12px; border-radius: 999px; border: 1px solid var(--pos-border);
+    background: #fff; font-size: 12px; font-weight: 650; color: #0f3a57; white-space: nowrap;
+}
+.afc-pos-sync-pill.is-online { border-color: #bbf7d0; background: #f0fdf4; color: #166534; }
+.afc-pos-sync-pill.is-offline { border-color: #fde68a; background: #fffbeb; color: #92400e; }
+.afc-pos-sync-pill.is-syncing { opacity: 0.85; }
+.afc-pos-sync-pill:disabled { cursor: default; }
+.afc-pos-sync-pill:not(:disabled):hover { filter: brightness(0.98); }
 .afc-pos-user-wrap { position: relative; }
 .afc-pos-user { display: flex; align-items: center; gap: 12px; padding-left: 20px; border-left: 1px solid var(--pos-border); text-align: left; }
 .afc-pos-avatar { display: grid; place-items: center; flex-shrink: 0; width: 46px; height: 46px; border-radius: 50%; background: linear-gradient(135deg, #006b82, #00516a); color: white; font-size: 16px; font-weight: 700; }
