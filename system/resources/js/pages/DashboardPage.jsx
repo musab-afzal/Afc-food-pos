@@ -91,10 +91,22 @@ export default function DashboardPage() {
 
     useEffect(() => {
         setLoading(true);
+        setError('');
+        if (!navigator.onLine) {
+            setData(null);
+            setError('You are offline. Open POS to keep selling — dashboard needs internet.');
+            setLoading(false);
+            return undefined;
+        }
         api(`/dashboard?year=${statsYear}`)
             .then((response) => setData(response.data))
-            .catch((caught) => setError(caught.message))
+            .catch((caught) => setError(
+                caught?.offline || caught?.status === 0
+                    ? 'You are offline. Open POS to keep selling — dashboard needs internet.'
+                    : caught.message,
+            ))
             .finally(() => setLoading(false));
+        return undefined;
     }, [statsYear]);
 
     const summary = data?.summary || {};
@@ -135,7 +147,12 @@ export default function DashboardPage() {
                 </div>
             </div>
 
-            {error && <p className="rounded-[5px] bg-coral/10 p-4 text-sm text-coral">{error}</p>}
+            {error && (
+                <div className="rounded-[5px] bg-coral/10 p-4 text-sm text-coral">
+                    <p>{error}</p>
+                    <Link to="/pos" className="mt-2 inline-flex font-semibold underline">Open POS (works offline)</Link>
+                </div>
+            )}
 
             {alertOpen && data?.low_stock_count > 0 && (
                 <div className="relative flex flex-wrap items-center gap-2 rounded-lg border border-primary/20 bg-primary-soft px-4 py-3 text-sm text-heading">

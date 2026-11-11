@@ -10,7 +10,7 @@ import { filterNavigation, navigation } from '../constants/navigation.js';
 export default function AppLayout() {
     const { pathname } = useLocation();
     const navigate = useNavigate();
-    const { user, logout, can, isSuperAdmin } = useAuth();
+    const { user, logout, can, isSuperAdmin, offlineSession } = useAuth();
     const [mobileOpen, setMobileOpen] = useState(false);
     const [openGroups, setOpenGroups] = useState({});
     const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -226,6 +226,11 @@ export default function AppLayout() {
 
             <div className="pt-[65px] lg:pl-[252px]">
                 <main className="min-h-[calc(100vh-65px)] p-4 lg:p-6">
+                    {(offlineSession || !navigator.onLine) && (
+                        <div className="mb-4 rounded-[5px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                            You are offline. Dashboard and reports need internet — use <Link to="/pos" className="font-semibold underline">POS</Link> to keep selling. Sales will sync when you reconnect.
+                        </div>
+                    )}
                     <Outlet />
                 </main>
             </div>

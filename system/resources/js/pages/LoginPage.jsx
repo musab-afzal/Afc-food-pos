@@ -22,7 +22,11 @@ export default function LoginPage() {
         try {
             await login(form);
         } catch (caught) {
-            setError(caught.message);
+            setError(
+                caught?.offline || caught?.status === 0 || !navigator.onLine
+                    ? 'You are offline. Connect to the internet to log in once, then POS can work offline.'
+                    : caught.message,
+            );
         } finally {
             setBusy(false);
         }
